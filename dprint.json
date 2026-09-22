@@ -1,0 +1,19 @@
+{
+  "markdown": {
+    "lineWidth": 100,
+    "textWrap": "always"
+  },
+  "json": {
+    "lineWidth": 100
+  },
+  "excludes": [
+    "External/**",
+    "tmp/**",
+    "**/.build/**",
+    "**/DerivedData/**"
+  ],
+  "plugins": [
+    "https://plugins.dprint.dev/markdown-0.17.8.wasm",
+    "https://plugins.dprint.dev/json-0.19.3.wasm"
+  ]
+}

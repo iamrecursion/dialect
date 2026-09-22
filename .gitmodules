@@ -1,0 +1,3 @@
+[submodule "External/swift-lispkit"]
+	path = External/swift-lispkit
+	url = git@github.com:iamrecursion/swift-lispkit.git
