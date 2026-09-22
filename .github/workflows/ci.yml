@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to a branch makes the run in flight redundant. Cancel it, except on main, where the run
+# for each commit is the record that that commit was green.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+# The Xcode every job uses, pinned by path so the version changes only when this line does, never
+# because the runner image's default moved. `xcrun` resolves swift-format through it, and so will
+# the build, which needs the watchOS 27 SDK and therefore Xcode 27.
+env:
+  DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+
+jobs:
+  # Everything runs through the devshell: each job is one `make` target, the same command with the
+  # same tool versions a contributor runs locally. Both jobs need macOS because swift-format comes
+  # from the Xcode toolchain rather than from nixpkgs (it has to match the SDK we build against),
+  # and Apple Silicon because that is the only system the flake defines.
+  #
+  # They run on `xcode-27`, a preview image, because no GA image carries Xcode 27 yet (macos-26 tops
+  # out at 26.6). Preview means GitHub may queue or occasionally break it. Move to the GA label, and
+  # keep DEVELOPER_DIR above pointing at 27, as soon as one ships with it.
+  #
+  # Formatting and linting are separate jobs so that a failure says which kind of problem it is.
+  format:
+    name: Format Check
+    runs-on: xcode-27
+    steps:
+      # The submodule is deliberately NOT checked out: External/ is excluded from every formatting
+      # target (reformatting the fork would turn each rebase into a conflict), and cloning LispKit
+      # costs far more than this job does.
+      - uses: actions/checkout@v5
+        with:
+          submodules: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Cache the Nix store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+
+      # A formatting disagreement between CI and a laptop is almost always a version skew, and this
+      # is what settles it from the log alone.
+      - name: Show the toolchain
+        run: |
+          xcodebuild -version
+          xcrun swift-format --version
+
+      # Source lists come from `git ls-files`, and actions/checkout leaves a clean tree, so every
+      # committed file is visible to the formatters. A file that is merely present but untracked is
+      # silently skipped: intended behavior, but worth knowing when a check passes unexpectedly.
+      - name: Check formatting
+        run: make format-check
+
+  lint:
+    name: Lint
+    runs-on: xcode-27
+    steps:
+      # As in the format job, External/ is excluded from every lint target.
+      - uses: actions/checkout@v5
+        with:
+          submodules: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Cache the Nix store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+
+      # A formatting disagreement between CI and a laptop is almost always a version skew, and this
+      # is what settles it from the log alone.
+      - name: Show the toolchain
+        run: |
+          xcodebuild -version
+          xcrun swift-format --version
+
+      - name: Lint
+        run: make lint

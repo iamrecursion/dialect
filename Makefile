@@ -39,9 +39,27 @@ NOT_OURS := ^(External|tmp)/
 SWIFT_SOURCES := $(shell git ls-files '*.swift' | grep -Ev '$(NOT_OURS)')
 NIX_SOURCES   := $(shell git ls-files '*.nix' | grep -Ev '$(NOT_OURS)')
 SHELL_SOURCES := $(shell git ls-files '*.sh' | grep -Ev '$(NOT_OURS)')
+YAML_SOURCES  := $(shell git ls-files '*.yml' '*.yaml' | grep -Ev '$(NOT_OURS)')
+PY_SOURCES    := $(shell git ls-files '*.py' | grep -Ev '$(NOT_OURS)')
+
+WORKFLOW_SOURCES := $(shell git ls-files '.github/workflows/*.yml' '.github/workflows/*.yaml')
 
 # Four spaces, matching Xcode's editor.
 SHFMT_FLAGS := --indent 4 --case-indent
+
+# Comments are what the formatters will not touch. swift-format neither breaks a line that runs past
+# the limit nor joins short ones back up, and dprint's YAML plugin fixes a comment's indentation but
+# never its contents -- so a paragraph wrapped at 60 columns and one wrapped at 140 both pass, for
+# ever. This pass is their exact complement: it rewrites comments and never code, and runs first so
+# neither can undo the other. Copied from tctiSH, with YAML support added.
+#
+# Doc comments get a narrower measure than the code above them: they are read as prose, in a popover
+# or on a docs page, and 100 columns of that is a wall.
+COMMENT_REFLOW    := utils/reflow-comments/reflow_comments.py
+COMMENT_WIDTH     := 100
+DOC_COMMENT_WIDTH := 80
+REFLOW_FLAGS      := --width $(COMMENT_WIDTH) --doc-width $(DOC_COMMENT_WIDTH)
+REFLOW            := $(SHELL_WRAPPER) python3 $(COMMENT_REFLOW) $(REFLOW_FLAGS)
 
 # -- Formatting -----------------------------------------------------------------------------------
 
@@ -52,6 +70,7 @@ SHFMT_FLAGS := --indent 4 --case-indent
 .PHONY: format-swift
 format-swift: ## Format the Swift sources
 	$(call require_xcode_tool,$(SWIFT_FORMAT),swift-format)
+	@test -z "$(SWIFT_SOURCES)" || $(REFLOW) $(SWIFT_SOURCES)
 	@test -z "$(SWIFT_SOURCES)" || $(SWIFT_FORMAT) format --parallel --in-place $(SWIFT_SOURCES)
 
 .PHONY: format-nix
@@ -63,11 +82,16 @@ format-shell: ## Format the shell scripts
 	@test -z "$(SHELL_SOURCES)" || $(SHELL_WRAPPER) shfmt $(SHFMT_FLAGS) --write $(SHELL_SOURCES)
 
 .PHONY: format-docs
-format-docs: ## Format the docs and configs (Markdown, JSON)
+format-docs: ## Format the docs and configs (Markdown, JSON, YAML)
+	@test -z "$(YAML_SOURCES)" || $(REFLOW) $(YAML_SOURCES)
 	$(SHELL_WRAPPER) dprint fmt
 
+.PHONY: format-python
+format-python: ## Format the Python sources
+	@test -z "$(PY_SOURCES)" || $(SHELL_WRAPPER) ruff format $(PY_SOURCES)
+
 .PHONY: format
-format: format-swift format-nix format-shell format-docs ## Format everything
+format: format-swift format-nix format-shell format-python format-docs ## Format everything
 
 # -- Checking -------------------------------------------------------------------------------------
 
@@ -76,6 +100,7 @@ format: format-swift format-nix format-shell format-docs ## Format everything
 .PHONY: format-check-swift
 format-check-swift: ## Check Swift formatting without changing files
 	$(call require_xcode_tool,$(SWIFT_FORMAT),swift-format)
+	@test -z "$(SWIFT_SOURCES)" || $(REFLOW) --check $(SWIFT_SOURCES)
 	@failed=0; for f in $(SWIFT_SOURCES); do \
 		$(SWIFT_FORMAT) format "$$f" | diff -u --label "$$f" --label "$$f (formatted)" "$$f" - || failed=1; \
 	done; exit $$failed
@@ -89,14 +114,63 @@ format-check-shell: ## Check shell formatting without changing files
 	@test -z "$(SHELL_SOURCES)" || $(SHELL_WRAPPER) shfmt $(SHFMT_FLAGS) --diff $(SHELL_SOURCES)
 
 .PHONY: format-check-docs
-format-check-docs: ## Check docs and config formatting without changing files
+format-check-docs: ## Check docs and config formatting (Markdown, JSON, YAML)
+	@test -z "$(YAML_SOURCES)" || $(REFLOW) --check $(YAML_SOURCES)
 	$(SHELL_WRAPPER) dprint check
 
+.PHONY: format-check-python
+format-check-python: ## Check Python formatting without changing files
+	@test -z "$(PY_SOURCES)" || $(SHELL_WRAPPER) ruff format --check $(PY_SOURCES)
+
 .PHONY: format-check
-format-check: format-check-swift format-check-nix format-check-shell format-check-docs ## Check all formatting without changing files
+format-check: format-check-swift format-check-nix format-check-shell format-check-python format-check-docs ## Check all formatting without changing files
+
+# -- Linting --------------------------------------------------------------------------------------
+
+# Deliberately separate from formatting, and `lint` does not run `format-check`: CI runs the two as
+# separate jobs, so a red Lint means the code is wrong and a red Format check means only its layout
+# is. Every target is a no-op when its language has no sources yet, as with formatting.
+
+.PHONY: lint-swift
+lint-swift: ## Lint the Swift sources
+	$(call require_xcode_tool,$(SWIFT_FORMAT),swift-format)
+	@test -z "$(SWIFT_SOURCES)" || $(SWIFT_FORMAT) lint --strict --parallel $(SWIFT_SOURCES)
+
+.PHONY: lint-python
+lint-python: ## Lint the Python sources
+	@test -z "$(PY_SOURCES)" || $(SHELL_WRAPPER) ruff check $(PY_SOURCES)
+
+.PHONY: lint-shell
+lint-shell: ## Lint the shell scripts
+	@test -z "$(SHELL_SOURCES)" || $(SHELL_WRAPPER) shellcheck $(SHELL_SOURCES)
+
+# actionlint type-checks `${{ }}` expressions, runner labels, and action inputs, and hands every
+# `run:` block to shellcheck -- which it finds on PATH, so this must run inside the devshell.
+.PHONY: lint-workflows
+lint-workflows: ## Lint the GitHub Actions workflows
+	@test -z "$(WORKFLOW_SOURCES)" || $(SHELL_WRAPPER) actionlint $(WORKFLOW_SOURCES)
+
+# The devshell is the only description of this project's toolchain, so check the flake itself, not
+# just that `nix develop` can enter it. Needs no wrapper: it is nix checking nix.
+.PHONY: lint-nix
+lint-nix: ## Check that the flake evaluates and its outputs build
+	nix flake check
 
 .PHONY: lint
-lint: format-check ## Run all the linting tasks
+lint: lint-swift lint-python lint-shell lint-workflows lint-nix ## Run all the linters
+
+# -- Project ------------------------------------------------------------------------------------
+
+# Dialect.xcodeproj is generated and gitignored; project.yml is the source of truth. Sources are
+# globbed from the Dialect/ directory, so adding a file needs no edit here -- only a regeneration.
+# Developer-specific settings the generated project needs but git must not carry.
+# A file rule rather than a phony one: it is created once, then left alone.
+Local.xcconfig: Local.xcconfig.example
+	cp $< $@
+
+.PHONY: project
+project: Local.xcconfig ## Generate Dialect.xcodeproj from project.yml
+	$(SHELL_WRAPPER) xcodegen generate
 
 # -- Submodules -----------------------------------------------------------------------------------
 

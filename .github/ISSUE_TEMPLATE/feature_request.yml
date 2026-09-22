@@ -1,0 +1,68 @@
+name: Feature request
+description: Suggest something Dialect should do.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Worth knowing before you write: Dialect is deliberately **wrist-first**. Writing code on
+        the watch is the point rather than a fallback, and the iOS companion is a conduit for files
+        and settings — never an authoring surface. Suggestions that move authoring to the phone are
+        the one category that will be declined on principle rather than on effort.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: >
+        The situation rather than the solution. What were you writing or running, and what was
+        awkward about it? A concrete example is worth more than a general description.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+      description: >
+        If you have a shape in mind — a menu entry, a gesture, a library procedure, a setting — say
+        so. If not, that is fine; the problem is the important half.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you tried?
+      description: A workaround using what exists today, or a reason none of it fits.
+
+  - type: dropdown
+    id: lispkit-side
+    attributes:
+      label: Is this really about Scheme rather than Dialect?
+      description: >
+        Dialect embeds [LispKit](https://github.com/objecthub/swift-lispkit) and does not change
+        what the language computes. A missing R7RS procedure, a wrong numeric result, or a library
+        that does not exist belongs upstream — and reaches Dialect when the fork next rebases.
+        Dialect's own territory is how you *write* and *run* Scheme on a watch.
+      options:
+        - "No — it is about editing or running Scheme on the watch"
+        - "Maybe — I am not sure which side it falls on"
+        - "Yes, but I think Dialect should work around it"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: standalone
+    attributes:
+      label: Would this work without a phone nearby?
+      description: >
+        Dialect works standalone, and that is not negotiable. A feature that only functions when
+        the companion is installed and in range has to degrade sensibly when it is not.
+      options:
+        - "Yes — entirely on the watch"
+        - "It would need the companion, but could degrade gracefully"
+        - "It fundamentally requires the phone"
+        - "Not sure"
+    validations:
+      required: true

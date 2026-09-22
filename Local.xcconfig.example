@@ -1,0 +1,14 @@
+// Developer-specific build settings.
+//
+// Copy this file to `Local.xcconfig` (gitignored) and fill in your values.
+// `make project` does that for you automatically if the file is missing.
+//
+// This exists because Dialect.xcodeproj is generated and gitignored: anything
+// set through Xcode's signing UI is destroyed by the next `make project`.
+// Settings that must survive regeneration, but must not be committed, live here.
+
+// Your Apple Developer team identifier, needed only for builds that run on a
+// physical device. Simulator builds do not need it. Find it in Xcode under
+// Settings > Accounts, or at developer.apple.com under Membership.
+//
+// DEVELOPMENT_TEAM = ABCDE12345

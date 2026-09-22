@@ -1,0 +1,109 @@
+name: Bug report
+description: Something in Dialect behaves incorrectly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Dialect runs a full Scheme implementation on a watch, so the two
+        things that narrow a bug down fastest are **the exact source you evaluated** and **whether
+        it also misbehaves off the wrist** — see the questions below.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I evaluated … in a REPL session and expected …, but the result shown was …
+    validations:
+      required: true
+
+  - type: textarea
+    id: source
+    attributes:
+      label: The Scheme involved
+      description: >
+        Paste the exact source, if any. Whitespace rarely matters in Scheme, but structure does —
+        and since Dialect edits an AST rather than text, it is worth saying whether you built the
+        form with the menus or typed it through the keyboard escape hatch.
+      render: scheme
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How can we reproduce it?
+      description: Numbered steps, starting from a fresh session where possible.
+      placeholder: |
+        1. Open a new REPL session.
+        2. Insert `(let …)` from the forms menu.
+        3. Fill the body slot with …
+        4. Evaluate. The result shows … instead of …
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Dialect's version, and the watchOS version from Settings → General → About.
+      placeholder: "Dialect 0.1.0, watchOS 27.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: hardware
+    attributes:
+      label: Where does it happen?
+      description: >
+        Several of Dialect's hardest constraints — the memory ceiling, snapshot timing when you
+        lower your wrist — behave differently in the simulator, so this genuinely changes where to
+        look.
+      options:
+        - Physical watch only
+        - Simulator only
+        - Both
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Dialect?
+      options:
+        - Editing (crown navigation, menus, atom entry)
+        - Evaluation (wrong result, error, hang)
+        - Sessions (saving, resuming, losing work)
+        - Files and media
+        - The iOS companion
+        - Something else / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: wrist-drop
+    attributes:
+      label: Was a computation interrupted by lowering your wrist?
+      description: >
+        Dialect snapshots the whole virtual machine so work survives suspension. If your problem
+        involves losing state, resuming into the wrong place, or a session that would not reopen,
+        this is almost certainly the relevant question.
+      options:
+        - "No — it happened with the screen on throughout"
+        - "Yes — the computation was running when the screen turned off"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I am on the latest release of Dialect.
+          required: true
+        - label: I searched the existing issues.
+          required: true

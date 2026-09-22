@@ -1,0 +1,13 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Scheme and LispKit itself
+    url: https://github.com/objecthub/swift-lispkit/issues
+    about: >
+      A missing R7RS procedure, a wrong numeric result, or a question about Scheme semantics
+      belongs upstream. Dialect carries a fork of LispKit that adds watchOS support; it does not
+      change what the language computes.
+  - name: Contributing
+    url: https://github.com/iamrecursion/dialect/blob/main/CONTRIBUTING.md
+    about: >
+      How to build Dialect, how the generated Xcode project works, how signing is configured, and
+      the branch discipline the LispKit fork follows.

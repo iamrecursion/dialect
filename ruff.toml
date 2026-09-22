@@ -1,0 +1,8 @@
+# Only one Python file today: utils/reflow-comments/reflow_comments.py, which is
+# shared verbatim with tctiSH. These settings match that project's ruff.toml so
+# the two copies do not drift apart every time either one is formatted.
+line-length = 100
+indent-width = 4
+
+[format]
+quote-style = "double"

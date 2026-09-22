@@ -1,0 +1,68 @@
+name: Dialect
+
+options:
+  bundleIdPrefix: com.iamrecursion
+  deploymentTarget:
+    watchOS: "27.0"
+    iOS: "27.0"
+  createIntermediateGroups: true
+  # Sources are picked up by globbing the directory below, so adding a file means creating it --
+  # project.yml only needs editing when a *target* changes.
+  generateEmptyDirectories: true
+
+# Developer-specific settings that must survive project regeneration without being committed. See
+# Local.xcconfig.example.
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # D10: the app builds in Swift 6 language mode. The LispKit fork stays on Swift 5, with the
+    # unsafe containment confined to one audited file.
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+targets:
+  Dialect:
+    type: application
+    platform: watchOS
+    sources:
+      - path: Dialect
+    settings:
+      base:
+        # `com.iamrecursion.dialect` is RESERVED for the iOS companion (sub-project D): a watch
+        # app's bundle ID must be prefixed by its companion's. Taking `.watch` now costs nothing --
+        # a bundle ID is permanent identity once shipped, and renaming later would orphan every
+        # existing install. Not `.watchkitapp`: that suffix was a WatchKit-extension-era convention,
+        # never a rule, and a suffix-free ID was verified to install on watchOS 27.
+        PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect.watch
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_WKApplication: YES
+        # The watch app has a companion counterpart, which is what makes WCSession usable at all
+        # (D24). It still installs and runs independently -- the companion is optional per D1.
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.iamrecursion.dialect
+        INFOPLIST_KEY_CFBundleDisplayName: Dialect
+        CODE_SIGN_STYLE: Automatic
+
+  DialectCompanion:
+    type: application
+    platform: iOS
+    sources:
+      - path: DialectCompanion
+    dependencies:
+      - target: Dialect
+        embed: true
+    settings:
+      base:
+        # Reserved for the companion since the watch app's ID must be prefixed by it. See D24 and
+        # the watch target above.
+        PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Dialect
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        CODE_SIGN_STYLE: Automatic

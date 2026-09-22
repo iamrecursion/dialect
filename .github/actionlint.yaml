@@ -1,0 +1,6 @@
+# Runner labels that actionlint does not know. Despite the key's name these are not self-hosted:
+# `xcode-27` is GitHub's preview image, newer than actionlint's built-in list. Remove it here when
+# ci.yml moves to a GA label.
+self-hosted-runner:
+  labels:
+    - xcode-27
