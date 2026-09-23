@@ -27,10 +27,17 @@ first; neither can undo the other.
 
 Usage:
 
-    python3 reflow_comments.py [--width N] [--doc-width N] [--check] FILE...
+    python3 reflow_comments.py [--width N] [--doc-width N] [--lines A:B]... [--check] FILE...
 
 Doc comments get their own width because they are read as prose, in a popover or
 on a docs page, rather than scanned alongside the code they sit above.
+
+`--lines A:B` confines the reflow to lines A to B, 1-based and inclusive, and may
+be repeated; it is how Dialect formats the comments it adds to files it does not
+own, such as its LispKit fork. A run of comment lines is split wherever it
+crosses the edge of a range, and only the parts inside are refilled, so a line
+outside every range is never touched. With several files, the ranges apply to
+each of them.
 
 `--check` writes nothing and exits non-zero if any file would change, printing a
 diff of what it would have done.
@@ -385,10 +392,17 @@ def reflow_run(rests, indent, marker, width):
     return output
 
 
-def reflow(text, language, width, doc_width):
-    """Returns `text` with every reflowable comment paragraph refilled."""
+def reflow(text, language, width, doc_width, ranges=None):
+    """Returns `text` with every reflowable comment paragraph refilled.
+
+    `ranges`, if given, is a list of `(first, last)` line numbers, 1-based and
+    inclusive: only comment lines inside one of them are refilled.
+    """
     lines = text.split("\n")
     starts = scan_for_comment_starts(lines, language)
+
+    def in_range(index):
+        return ranges is None or any(first <= index + 1 <= last for first, last in ranges)
 
     output = []
     index = 0
@@ -404,18 +418,39 @@ def reflow(text, language, width, doc_width):
 
         # A run is broken by a change of either, so a `///` block below a `//`
         # one, or a differently indented continuation, is reflowed separately.
+        # So is one that crosses the edge of a range, and the part outside is
+        # reproduced exactly as it was.
+        inside = in_range(index)
+        begin = index
         rests = []
         while index < len(lines) and starts[index]:
             current = language.comment.match(lines[index])
             if current["indent"] != indent or current["marker"] != marker:
                 break
+            if in_range(index) != inside:
+                break
             rests.append(current["rest"])
             index += 1
+
+        if not inside:
+            output.extend(lines[begin:index])
+            continue
 
         target = doc_width if marker in language.doc_markers else width
         output.extend(reflow_run(rests, indent, marker, target))
 
     return "\n".join(output)
+
+
+def line_range(value):
+    """Parses `A:B` for `--lines`."""
+    try:
+        first, last = (int(part) for part in value.split(":"))
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected A:B, got {value!r}") from None
+    if not 1 <= first <= last:
+        raise argparse.ArgumentTypeError(f"expected 1 <= A <= B, got {value!r}")
+    return (first, last)
 
 
 def main(argv=None):
@@ -427,6 +462,13 @@ def main(argv=None):
         type=int,
         default=None,
         help="columns to fill doc comments to; defaults to --width",
+    )
+    parser.add_argument(
+        "--lines",
+        action="append",
+        type=line_range,
+        metavar="A:B",
+        help="refill only comments within lines A to B (1-based, inclusive); repeatable",
     )
     parser.add_argument(
         "--check",
@@ -447,7 +489,7 @@ def main(argv=None):
         with open(path, encoding="utf-8", newline="") as handle:
             original = handle.read()
 
-        updated = reflow(original, language, args.width, doc_width)
+        updated = reflow(original, language, args.width, doc_width, args.lines)
         if updated == original:
             continue
 

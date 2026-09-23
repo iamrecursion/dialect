@@ -50,8 +50,10 @@ SHFMT_FLAGS := --indent 4 --case-indent
 # Comments are what the formatters will not touch. swift-format neither breaks a line that runs past
 # the limit nor joins short ones back up, and dprint's YAML plugin fixes a comment's indentation but
 # never its contents -- so a paragraph wrapped at 60 columns and one wrapped at 140 both pass, for
-# ever. This pass is their exact complement: it rewrites comments and never code, and runs first so
-# neither can undo the other. Copied from tctiSH, with YAML support added.
+# ever. This pass is their exact complement: it rewrites comments and never code. It runs after
+# swift-format, which reindents comments along with code, so it fills them at their final
+# indentation; swift-format never changes comment text, so neither undoes the other. Copied from
+# tctiSH, with YAML support added.
 #
 # Doc comments get a narrower measure than the code above them: they are read as prose, in a popover
 # or on a docs page, and 100 columns of that is a wall.
@@ -60,6 +62,12 @@ COMMENT_WIDTH     := 100
 DOC_COMMENT_WIDTH := 80
 REFLOW_FLAGS      := --width $(COMMENT_WIDTH) --doc-width $(DOC_COMMENT_WIDTH)
 REFLOW            := $(SHELL_WRAPPER) python3 $(COMMENT_REFLOW) $(REFLOW_FLAGS)
+
+# What Dialect adds to its forks (LispKit, MarkdownKit, CLFormat) is formatted by Dialect's rules,
+# and nothing upstream owns is touched: files a fork added get swift-format and the full reflow, and
+# files upstream owns have only the comments on lines the fork added refilled. The script explains
+# why, and skips a fork that is not checked out (as in CI) or has no `upstream` remote.
+FORMAT_FORK := $(SHELL_WRAPPER) python3 utils/format-fork/format_fork.py $(REFLOW_FLAGS)
 
 # -- Formatting -----------------------------------------------------------------------------------
 
@@ -70,8 +78,8 @@ REFLOW            := $(SHELL_WRAPPER) python3 $(COMMENT_REFLOW) $(REFLOW_FLAGS)
 .PHONY: format-swift
 format-swift: ## Format the Swift sources
 	$(call require_xcode_tool,$(SWIFT_FORMAT),swift-format)
-	@test -z "$(SWIFT_SOURCES)" || $(REFLOW) $(SWIFT_SOURCES)
 	@test -z "$(SWIFT_SOURCES)" || $(SWIFT_FORMAT) format --parallel --in-place $(SWIFT_SOURCES)
+	@test -z "$(SWIFT_SOURCES)" || $(REFLOW) $(SWIFT_SOURCES)
 
 .PHONY: format-nix
 format-nix: ## Format the Nix sources
@@ -90,8 +98,13 @@ format-docs: ## Format the docs and configs (Markdown, JSON, YAML)
 format-python: ## Format the Python sources
 	@test -z "$(PY_SOURCES)" || $(SHELL_WRAPPER) ruff format $(PY_SOURCES)
 
+.PHONY: format-fork
+format-fork: ## Format what Dialect has added to its forks
+	$(call require_xcode_tool,$(SWIFT_FORMAT),swift-format)
+	@$(FORMAT_FORK) --swift-format $(SWIFT_FORMAT)
+
 .PHONY: format
-format: format-swift format-nix format-shell format-python format-docs ## Format everything
+format: format-swift format-nix format-shell format-python format-docs format-fork ## Format everything
 
 # -- Checking -------------------------------------------------------------------------------------
 
@@ -122,8 +135,13 @@ format-check-docs: ## Check docs and config formatting (Markdown, JSON, YAML)
 format-check-python: ## Check Python formatting without changing files
 	@test -z "$(PY_SOURCES)" || $(SHELL_WRAPPER) ruff format --check $(PY_SOURCES)
 
+.PHONY: format-check-fork
+format-check-fork: ## Check formatting of what Dialect has added to its forks
+	$(call require_xcode_tool,$(SWIFT_FORMAT),swift-format)
+	@$(FORMAT_FORK) --swift-format $(SWIFT_FORMAT) --check
+
 .PHONY: format-check
-format-check: format-check-swift format-check-nix format-check-shell format-check-python format-check-docs ## Check all formatting without changing files
+format-check: format-check-swift format-check-nix format-check-shell format-check-python format-check-docs format-check-fork ## Check all formatting without changing files
 
 # -- Linting --------------------------------------------------------------------------------------
 
@@ -175,8 +193,21 @@ project: Local.xcconfig ## Generate Dialect.xcodeproj from project.yml
 # -- Submodules -----------------------------------------------------------------------------------
 
 .PHONY: submodules
-submodules: ## Check out the submodules (the swift-lispkit fork)
+submodules: ## Check out the submodules (the LispKit, MarkdownKit and CLFormat forks)
 	git submodule update --init --recursive
+
+# Builds a fork for the watch simulator and then checks, with vtool, that every object file really
+# is for watchOS: SwiftPM ignores `-Xswiftc -target` and reports success on a macOS build, so a
+# green build alone proves nothing. Needs only Xcode, not the devshell.
+#
+# FORK and TARGET pick what to build, e.g. `make fork-watch-build FORK=swift-markdownkit
+# TARGET=MarkdownKit`; by default it is LispKit, which builds the MarkdownKit fork along the way.
+FORK   ?= swift-lispkit
+TARGET ?= LispKit
+
+.PHONY: fork-watch-build
+fork-watch-build: ## Build a fork for the watch simulator and verify the platform (FORK=, TARGET=)
+	utils/fork-watch-build/fork-watch-build.sh $(FORK) $(TARGET)
 
 # -- Cleaning -------------------------------------------------------------------------------------
 

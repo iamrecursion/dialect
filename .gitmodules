@@ -1,3 +1,9 @@
 [submodule "External/swift-lispkit"]
 	path = External/swift-lispkit
 	url = git@github.com:iamrecursion/swift-lispkit.git
+[submodule "External/swift-markdownkit"]
+	path = External/swift-markdownkit
+	url = git@github.com:iamrecursion/swift-markdownkit.git
+[submodule "External/swift-clformat"]
+	path = External/swift-clformat
+	url = git@github.com:iamrecursion/swift-clformat.git

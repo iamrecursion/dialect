@@ -1,0 +1,376 @@
+{
+  "features" : [
+    "refractivity",
+    "specular-location"
+  ],
+  "fill-specializations" : [
+    {
+      "value" : {
+        "automatic-gradient" : "display-p3:0.30980,0.41961,0.27059,1.00000"
+      }
+    },
+    {
+      "idiom" : "watchOS",
+      "value" : {
+        "automatic-gradient" : "display-p3:0.17647,0.21961,0.16078,1.00000"
+      }
+    }
+  ],
+  "groups" : [
+    {
+      "blur-material" : null,
+      "hidden" : false,
+      "layers" : [
+        {
+          "hidden-specializations" : [
+            {
+              "idiom" : "watchOS",
+              "value" : true
+            }
+          ],
+          "image-name" : "Bearing.svg",
+          "name" : "Bearing"
+        },
+        {
+          "glass" : true,
+          "image-name" : "Rim.svg",
+          "name" : "Rim"
+        }
+      ],
+      "lighting" : "individual",
+      "name" : "Hub Bearing",
+      "position-specializations" : [
+        {
+          "idiom" : "watchOS",
+          "value" : {
+            "scale" : 1.18,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "refractivity" : {
+        "depth" : 0.4989453124999999,
+        "enabled" : false,
+        "strength" : -1
+      },
+      "shadow-specializations" : [
+        {
+          "value" : {
+            "kind" : "layer-color",
+            "opacity" : 0
+          }
+        },
+        {
+          "appearance" : "tinted",
+          "value" : {
+            "kind" : "neutral",
+            "opacity" : 0.56
+          }
+        }
+      ],
+      "specular" : "outside",
+      "translucency-specializations" : [
+        {
+          "value" : {
+            "enabled" : false,
+            "value" : 0.49
+          }
+        },
+        {
+          "appearance" : "tinted",
+          "value" : {
+            "enabled" : true,
+            "value" : 0
+          }
+        }
+      ]
+    },
+    {
+      "blur-material" : 0,
+      "layers" : [
+        {
+          "fill-specializations" : [
+            {
+              "appearance" : "tinted",
+              "value" : {
+                "solid" : "display-p3:0.13725,0.17255,0.12549,1.00000"
+              }
+            }
+          ],
+          "image-name" : "Second 2.svg",
+          "name" : "Second",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              -96,
+              -123
+            ]
+          }
+        },
+        {
+          "fill-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : "system-light"
+            },
+            {
+              "idiom" : "watchOS",
+              "value" : "system-light"
+            }
+          ],
+          "glass" : true,
+          "image-name" : "Minute.svg",
+          "name" : "Minute",
+          "opacity-specializations" : [
+            {
+              "value" : 1
+            },
+            {
+              "appearance" : "dark",
+              "value" : 0.5
+            },
+            {
+              "idiom" : "watchOS",
+              "value" : 0.5
+            }
+          ],
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              92.75999999999999,
+              123.18338065764408
+            ]
+          }
+        },
+        {
+          "fill-specializations" : [
+            {
+              "value" : "none"
+            },
+            {
+              "appearance" : "dark",
+              "value" : "system-light"
+            },
+            {
+              "idiom" : "watchOS",
+              "value" : "system-light"
+            }
+          ],
+          "image-name" : "Hour.svg",
+          "name" : "Hour",
+          "opacity-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : 0.5
+            },
+            {
+              "idiom" : "watchOS",
+              "value" : 0.5
+            }
+          ],
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              -94,
+              118
+            ]
+          }
+        }
+      ],
+      "lighting" : "individual",
+      "name" : "Hands",
+      "position-specializations" : [
+        {
+          "idiom" : "watchOS",
+          "value" : {
+            "scale" : 1.18,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "refractivity" : {
+        "depth" : 0.7046484375,
+        "enabled" : false,
+        "strength" : -0.7583984375
+      },
+      "shadow-specializations" : [
+        {
+          "value" : {
+            "kind" : "layer-color",
+            "opacity" : 0.8
+          }
+        },
+        {
+          "appearance" : "tinted",
+          "value" : {
+            "kind" : "neutral",
+            "opacity" : 2
+          }
+        }
+      ],
+      "specular" : "outside",
+      "translucency-specializations" : [
+        {
+          "value" : {
+            "enabled" : true,
+            "value" : 0.21
+          }
+        },
+        {
+          "appearance" : "tinted",
+          "value" : {
+            "enabled" : true,
+            "value" : 0
+          }
+        }
+      ]
+    },
+    {
+      "blur-material" : null,
+      "layers" : [
+        {
+          "fill-specializations" : [
+            {
+              "value" : "automatic"
+            },
+            {
+              "appearance" : "dark",
+              "value" : "system-light"
+            },
+            {
+              "idiom" : "watchOS",
+              "value" : "system-light"
+            }
+          ],
+          "glass" : true,
+          "image-name" : "Ticks.svg",
+          "name" : "Ticks",
+          "opacity-specializations" : [
+            {
+              "value" : 1
+            },
+            {
+              "appearance" : "dark",
+              "value" : 0.25
+            },
+            {
+              "idiom" : "watchOS",
+              "value" : 0.25
+            }
+          ],
+          "position-specializations" : [
+            {
+              "idiom" : "watchOS",
+              "value" : {
+                "scale" : 1.18,
+                "translation-in-points" : [
+                  0,
+                  0
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "lighting" : "individual",
+      "name" : "Ticks",
+      "opacity" : 1,
+      "refractivity" : {
+        "depth" : 0,
+        "enabled" : false,
+        "strength" : 0.9490234375
+      },
+      "shadow-specializations" : [
+        {
+          "value" : {
+            "kind" : "layer-color",
+            "opacity" : 0.68
+          }
+        },
+        {
+          "appearance" : "dark",
+          "value" : {
+            "kind" : "layer-color",
+            "opacity" : 0.59
+          }
+        },
+        {
+          "appearance" : "tinted",
+          "value" : {
+            "kind" : "neutral",
+            "opacity" : 1
+          }
+        }
+      ],
+      "specular" : "outside",
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.22
+      }
+    },
+    {
+      "blend-mode" : "normal",
+      "blur-material" : null,
+      "hidden-specializations" : [
+        {
+          "idiom" : "watchOS",
+          "value" : true
+        }
+      ],
+      "layers" : [
+        {
+          "fill" : "system-light",
+          "image-name" : "Face 2.svg",
+          "name" : "Face",
+          "opacity" : 1
+        }
+      ],
+      "name" : "Clock Face",
+      "opacity-specializations" : [
+        {
+          "value" : 0.41
+        },
+        {
+          "appearance" : "tinted",
+          "value" : 0.52
+        }
+      ],
+      "refractivity" : {
+        "depth" : 0.7046484375,
+        "enabled" : true,
+        "strength" : -0.7583984375
+      },
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency-specializations" : [
+        {
+          "value" : {
+            "enabled" : true,
+            "value" : 0.3
+          }
+        },
+        {
+          "appearance" : "tinted",
+          "value" : {
+            "enabled" : true,
+            "value" : 0.2
+          }
+        }
+      ]
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

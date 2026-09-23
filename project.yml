@@ -32,6 +32,10 @@ targets:
     platform: watchOS
     sources:
       - path: Dialect
+      # One Icon Composer file serves both apps: it declares circles for watchOS and squares for
+      # everything else, and the asset compiler renders each app's own from it. XcodeGen treats a
+      # directory with an extension as a single file, so this needs no fileTypes override.
+      - path: assets/Dialect.icon
     settings:
       base:
         # `com.iamrecursion.dialect` is RESERVED for the iOS companion (sub-project D): a watch
@@ -40,6 +44,8 @@ targets:
         # existing install. Not `.watchkitapp`: that suffix was a WatchKit-extension-era convention,
         # never a rule, and a suffix-free ID was verified to install on watchOS 27.
         PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect.watch
+        # The `.icon` file's name, without the extension. No asset catalog is needed.
+        ASSETCATALOG_COMPILER_APPICON_NAME: Dialect
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_WKApplication: YES
         # The watch app has a companion counterpart, which is what makes WCSession usable at all
@@ -53,6 +59,7 @@ targets:
     platform: iOS
     sources:
       - path: DialectCompanion
+      - path: assets/Dialect.icon
     dependencies:
       - target: Dialect
         embed: true
@@ -61,6 +68,7 @@ targets:
         # Reserved for the companion since the watch app's ID must be prefixed by it. See D24 and
         # the watch target above.
         PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect
+        ASSETCATALOG_COMPILER_APPICON_NAME: Dialect
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Dialect
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES

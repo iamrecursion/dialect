@@ -10,3 +10,6 @@ DerivedData/
 
 # Developer-specific build settings; see Local.xcconfig.example
 Local.xcconfig
+
+# Python bytecode caches
+__pycache__/
