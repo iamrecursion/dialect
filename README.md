@@ -48,4 +48,5 @@ editing workflow looks like, but we're only at the very start of the application
 Copyright 2026 Ara Adkins, licensed under the [Apache License 2.0](LICENSE).
 
 Dialect builds on LispKit and bundles third-party Scheme libraries under their own permissive
-licences; the complete attribution set ships inside the app.
+licences; the complete attribution set is in [`NOTICE-dialect.md`](NOTICE-dialect.md), and ships
+inside the app.
