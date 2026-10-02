@@ -209,14 +209,12 @@ TARGET ?= LispKit
 fork-watch-build: ## Build a fork for the watch simulator and verify the platform (FORK=, TARGET=)
 	utils/fork-watch-build/fork-watch-build.sh $(FORK) $(TARGET)
 
-# Boots LispKit from its bundled resources and smoke-tests what the fork changes, spawned in a watch
-# simulator (by default the Ultra 4; SIMULATOR= takes a name or UDID). PLATFORM=mac runs it on this
-# Mac instead, where the watchOS-only checks are skipped. Needs only Xcode.
-PLATFORM ?= watch
-
-.PHONY: lispkit-smoke
-lispkit-smoke: ## Run the LispKit smoke test in a watch simulator (PLATFORM=mac, SIMULATOR=)
-	utils/lispkit-smoke/lispkit-smoke.sh $(PLATFORM)
+# Runs DialectTests, hosted by the watch app, in a watch simulator: by default the Ultra 4
+# (SIMULATOR= takes a name or UDID). Regenerates the project first, because a new source file joins
+# its target only when the project is generated. Needs the devshell only for that regeneration.
+.PHONY: test
+test: project ## Run the app's tests in a watch simulator (SIMULATOR=)
+	SIMULATOR='$(SIMULATOR)' utils/app-test/app-test.sh
 
 # -- Cleaning -------------------------------------------------------------------------------------
 

@@ -26,6 +26,12 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 
+# LispKit, through Dialect's fork (A), which builds for watchOS. Its own dependencies are pinned in
+# the fork's Package.resolved and fetched on a fresh checkout's first build.
+packages:
+  LispKit:
+    path: External/swift-lispkit
+
 targets:
   Dialect:
     type: application
@@ -36,6 +42,35 @@ targets:
       # everything else, and the asset compiler renders each app's own from it. XcodeGen treats a
       # directory with an extension as a single file, so this needs no fileTypes override.
       - path: assets/Dialect.icon
+      # The Credits screen reads these at runtime, so the app shows the files themselves and cannot
+      # drift from them (D13).
+      - path: NOTICE-dialect.md
+        buildPhase: resources
+      - path: LICENSE
+        buildPhase: resources
+      # Code the widget extension shares, such as the launch links its complications open.
+      - path: Shared
+    # The `dialect://` links that complications open and `simctl openurl` can test. XcodeGen writes
+    # this file on every `make project` (gitignored); Xcode merges the generated keys into it.
+    info:
+      path: Generated/Dialect-Info.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: com.iamrecursion.dialect.watch
+            CFBundleURLSchemes:
+              - dialect
+    # The complications, embedded in the app (D24's companion embeds the app in turn).
+    dependencies:
+      - target: DialectWidgets
+        embed: true
+      - package: LispKit
+        product: LispKit
+    # A shared scheme that also builds and runs the tests, so `xcodebuild test -scheme Dialect`
+    # works.
+    scheme:
+      testTargets:
+        - DialectTests
+        - DialectUITests
     settings:
       base:
         # `com.iamrecursion.dialect` is RESERVED for the iOS companion (sub-project D): a watch
@@ -53,6 +88,57 @@ targets:
         INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.iamrecursion.dialect
         INFOPLIST_KEY_CFBundleDisplayName: Dialect
         CODE_SIGN_STYLE: Automatic
+
+  # The watch app's complications: a WidgetKit extension. It shares `Shared/` with the app, such as
+  # the launch links its complications open.
+  DialectWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: DialectWidgets
+      - path: Shared
+    info:
+      path: Generated/DialectWidgets-Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect.watch.widgets
+        GENERATE_INFOPLIST_FILE: YES
+        # Lets shared code leave out what only the app has, such as the launch router.
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) WIDGET_EXTENSION
+        INFOPLIST_KEY_CFBundleDisplayName: Dialect
+        CODE_SIGN_STYLE: Automatic
+
+  # The app's unit tests, hosted by the watch app: `Bundle.main` is the app's bundle, so tests see
+  # its resources. Run them with `make test`.
+  DialectTests:
+    type: bundle.unit-test
+    platform: watchOS
+    sources:
+      - path: DialectTests
+    dependencies:
+      - target: Dialect
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect.watch.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  # UI tests: they drive the running app in the simulator, for what unit tests cannot see, such as
+  # which button a tap reaches.
+  DialectUITests:
+    type: bundle.ui-testing
+    platform: watchOS
+    sources:
+      - path: DialectUITests
+    dependencies:
+      - target: Dialect
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect.watch.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Dialect
 
   DialectCompanion:
     type: application
