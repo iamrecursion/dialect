@@ -13,8 +13,8 @@ struct CrownSliderTests {
         #expect(!CrownSlider.reachedEnd(from: 0.4, to: 0.5, in: 0...1))
     }
 
-    /// The crown's own value, divided back down, lands on a whole step within
-    /// the range.
+    /// The crown's value, divided back down, lands on a whole step within the
+    /// range.
     @Test func snapsTheCrownsValueToAStep() {
         #expect(abs(CrownSlider.snapped(0.6 + 1e-12, to: 0.01, in: 0...1) - 0.6) < 1e-12)
         #expect(abs(CrownSlider.snapped(0.604, to: 0.01, in: 0...1) - 0.6) < 1e-12)

@@ -33,11 +33,53 @@ struct DebugPathTests {
             ])
     }
 
+    /// `more:` opens an item's More screen over the folders it's in.
+    @Test func opensAnItemsMore() {
+        let notes = FilePath(components: ["notes"])
+        #expect(
+            Route.debugPath("more:notes/todo.txt", creditsPages: pages) == [
+                .files, .folder(notes), .itemMore(notes.appending("todo.txt")),
+            ])
+        #expect(
+            Route.debugPath("files/more:readme", creditsPages: pages) == [
+                .files, .itemMore(FilePath(components: ["readme"])),
+            ])
+    }
+
+    @Test func opensTheBinAndAdd() {
+        #expect(Route.debugPath("files/trash", creditsPages: pages) == [.files, .bin])
+        #expect(Route.debugPath("files/add", creditsPages: pages) == [.files, .add(.root)])
+        #expect(
+            Route.debugPath("files/new-session", creditsPages: pages) == [
+                .files, .newItem(.session, in: .root),
+            ])
+        #expect(Route.debugPath("files/new-nope", creditsPages: pages) == [.files])
+        #expect(
+            Route.debugPath("settings/file-settings/text-extensions", creditsPages: pages) == [
+                .settings, .fileSettings, .textExtensions,
+            ])
+    }
+
     @Test func walksCreditsPagesByTitle() {
         #expect(
             Route.debugPath("settings/credits/Licence texts/CBORCoding", creditsPages: pages) == [
                 .settings, .credits, .creditsPage(pages[1]), .creditsPage(license),
             ])
+    }
+
+    /// `folder:` takes the rest of the path as a folder below Files' root, with
+    /// a route per level so Back climbs them.
+    @Test func opensFolders() {
+        let scripts = FilePath(components: ["scripts"])
+        #expect(
+            Route.debugPath("files/folder:scripts/lib", creditsPages: pages) == [
+                .files, .folder(scripts), .folder(scripts.appending("lib")),
+            ])
+        #expect(
+            Route.debugPath("folder:notes", creditsPages: pages) == [
+                .files, .folder(FilePath(components: ["notes"])),
+            ])
+        #expect(Route.debugPath("files/folder:", creditsPages: pages) == [.files])
     }
 
     @Test func stopsAtTheFirstUnknownSegment() {

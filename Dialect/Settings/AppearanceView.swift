@@ -7,6 +7,8 @@ struct AppearanceView: View {
     ]
 
     @Environment(\.dialectAccent) private var accent
+    @AppStorage(FileSettings.dateStyleKey) private var dateStyle = FileSettings.dateStyleDefault
+    @AppStorage(FileSettings.use24HourKey) private var use24Hour = FileSettings.use24HourDefault
 
     var body: some View {
         List {
@@ -21,6 +23,16 @@ struct AppearanceView: View {
                             .accessibilityHidden(true)
                     }
                 }
+            }
+            // How Files shows dates and times.
+            Section {
+                Picker("Dates", selection: $dateStyle) {
+                    ForEach(DateStyle.allCases, id: \.self) { style in
+                        Text(style.title).tag(style)
+                    }
+                }
+                .pickerStyle(.navigationLink)
+                Toggle("Use 24-Hour Time", isOn: $use24Hour)
             }
         }
         .navigationTitle("Appearance")

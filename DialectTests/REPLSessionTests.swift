@@ -16,8 +16,7 @@ struct REPLSessionTests {
         #expect(session.entries.first?.evaluation?.result == .value("3"))
     }
 
-    /// A mistake stays in the field to be fixed (Starfire): only a success
-    /// clears it.
+    /// A mistake stays in the field to be fixed; only a success clears it.
     @Test func keepsAnEntryThatFailed() async {
         let session = REPLSession()
         defer { session.close() }

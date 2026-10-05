@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
-# This is set if inside the devshell, so any command that MUST run in the devshell should have
-# $(SHELL_WRAPPER) prefixed.
+# Commands that must run in the devshell are prefixed with $(SHELL_WRAPPER), which enters it when
+# make runs outside it.
 ifeq ($(IN_NIX_SHELL),)
     SHELL_WRAPPER := nix develop --command
 else
@@ -14,8 +14,8 @@ help:
 
 # -- Tooling --------------------------------------------------------------------------------------
 
-# Swift tooling comes from the active Xcode toolchain, not from nixpkgs: it has to match the SDK we
-# build against. The devshell deliberately does not provide it.
+# Swift tooling comes from the active Xcode toolchain, as it must match the SDK we build against.
+# The devshell doesn't provide it.
 SWIFT_FORMAT := $(shell xcrun --find swift-format 2>/dev/null)
 
 define require_xcode_tool
@@ -33,7 +33,7 @@ endef
 #   External                the swift-lispkit fork, carried as a submodule. Its formatting is
 #                           upstream's, and reformatting it would make every rebase a conflict.
 #   tmp                     local design notes and plans; gitignored, so `git ls-files` never
-#                           reports them anyway. Listed for the benefit of anyone who un-ignores it.
+#                           reports them. Listed in case it's ever un-ignored.
 NOT_OURS := ^(External|tmp)/
 
 SWIFT_SOURCES := $(shell git ls-files '*.swift' | grep -Ev '$(NOT_OURS)')
@@ -47,16 +47,13 @@ WORKFLOW_SOURCES := $(shell git ls-files '.github/workflows/*.yml' '.github/work
 # Four spaces, matching Xcode's editor.
 SHFMT_FLAGS := --indent 4 --case-indent
 
-# Comments are what the formatters will not touch. swift-format neither breaks a line that runs past
-# the limit nor joins short ones back up, and dprint's YAML plugin fixes a comment's indentation but
-# never its contents -- so a paragraph wrapped at 60 columns and one wrapped at 140 both pass, for
-# ever. This pass is their exact complement: it rewrites comments and never code. It runs after
-# swift-format, which reindents comments along with code, so it fills them at their final
-# indentation; swift-format never changes comment text, so neither undoes the other. Copied from
-# tctiSH, with YAML support added.
+# The formatters leave comment text alone: swift-format neither breaks long lines nor joins short
+# ones, and dprint's YAML plugin fixes only a comment's indentation, so comments wrapped at any
+# width pass. This pass rewraps comments and never touches code. It runs after swift-format, which
+# reindents comments with the code, so it wraps them at their final indentation; swift-format never
+# changes comment text, so neither undoes the other.
 #
-# Doc comments get a narrower measure than the code above them: they are read as prose, in a popover
-# or on a docs page, and 100 columns of that is a wall.
+# Doc comments are narrower, as they're read as prose in a popover or on a docs page.
 COMMENT_REFLOW    := utils/reflow-comments/reflow_comments.py
 COMMENT_WIDTH     := 100
 DOC_COMMENT_WIDTH := 80
@@ -65,15 +62,14 @@ REFLOW            := $(SHELL_WRAPPER) python3 $(COMMENT_REFLOW) $(REFLOW_FLAGS)
 
 # What Dialect adds to its forks (LispKit, MarkdownKit, CLFormat) is formatted by Dialect's rules,
 # and nothing upstream owns is touched: files a fork added get swift-format and the full reflow, and
-# files upstream owns have only the comments on lines the fork added refilled. The script explains
-# why, and skips a fork that is not checked out (as in CI) or has no `upstream` remote.
+# files upstream owns have only the comments on lines the fork added refilled. The script skips a
+# fork that isn't checked out (as in CI) or has no `upstream` remote.
 FORMAT_FORK := $(SHELL_WRAPPER) python3 utils/format-fork/format_fork.py $(REFLOW_FLAGS)
 
 # -- Formatting -----------------------------------------------------------------------------------
 
-# Every formatting target is a no-op when its language has no sources yet, so `make format` works on
-# a tree that is still mostly empty. Without the guard, swift-format and shfmt both error out when
-# handed an empty argument list.
+# Each formatting target does nothing when its language has no sources, as swift-format and shfmt
+# fail on an empty argument list.
 
 .PHONY: format-swift
 format-swift: ## Format the Swift sources
@@ -108,8 +104,8 @@ format: format-swift format-nix format-shell format-python format-docs format-fo
 
 # -- Checking -------------------------------------------------------------------------------------
 
-# swift-format has no --check, so diff its output against the file. `diff -u` exits non-zero on a
-# difference, and the loop keeps going so one run reports every offending file rather than the first.
+# swift-format has no --check, so this diffs its output against the file. `diff -u` exits non-zero
+# on a difference, and the loop continues so one run reports every offending file.
 .PHONY: format-check-swift
 format-check-swift: ## Check Swift formatting without changing files
 	$(call require_xcode_tool,$(SWIFT_FORMAT),swift-format)
@@ -145,9 +141,9 @@ format-check: format-check-swift format-check-nix format-check-shell format-chec
 
 # -- Linting --------------------------------------------------------------------------------------
 
-# Deliberately separate from formatting, and `lint` does not run `format-check`: CI runs the two as
-# separate jobs, so a red Lint means the code is wrong and a red Format check means only its layout
-# is. Every target is a no-op when its language has no sources yet, as with formatting.
+# `lint` doesn't run `format-check`: CI runs them as separate jobs, so a red Lint means the code is
+# wrong and a red Format check means only its layout is. Each target does nothing when its language
+# has no sources.
 
 .PHONY: lint-swift
 lint-swift: ## Lint the Swift sources
@@ -168,8 +164,8 @@ lint-shell: ## Lint the shell scripts
 lint-workflows: ## Lint the GitHub Actions workflows
 	@test -z "$(WORKFLOW_SOURCES)" || $(SHELL_WRAPPER) actionlint $(WORKFLOW_SOURCES)
 
-# The devshell is the only description of this project's toolchain, so check the flake itself, not
-# just that `nix develop` can enter it. Needs no wrapper: it is nix checking nix.
+# The devshell is the only description of the toolchain, so this checks that the flake evaluates
+# and builds. It needs no wrapper.
 .PHONY: lint-nix
 lint-nix: ## Check that the flake evaluates and its outputs build
 	nix flake check
@@ -179,10 +175,11 @@ lint: lint-swift lint-python lint-shell lint-workflows lint-nix ## Run all the l
 
 # -- Project ------------------------------------------------------------------------------------
 
-# Dialect.xcodeproj is generated and gitignored; project.yml is the source of truth. Sources are
-# globbed from the Dialect/ directory, so adding a file needs no edit here -- only a regeneration.
-# Developer-specific settings the generated project needs but git must not carry.
-# A file rule rather than a phony one: it is created once, then left alone.
+# Dialect.xcodeproj is generated from project.yml and gitignored. Sources are globbed from
+# Dialect/, so a new file needs only a regeneration.
+#
+# Local.xcconfig holds developer-specific settings the generated project needs and git must not
+# carry. It's copied once, then left alone.
 Local.xcconfig: Local.xcconfig.example
 	cp $< $@
 
@@ -196,9 +193,9 @@ project: Local.xcconfig ## Generate Dialect.xcodeproj from project.yml
 submodules: ## Check out the submodules (the LispKit, MarkdownKit and CLFormat forks)
 	git submodule update --init --recursive
 
-# Builds a fork for the watch simulator and then checks, with vtool, that every object file really
-# is for watchOS: SwiftPM ignores `-Xswiftc -target` and reports success on a macOS build, so a
-# green build alone proves nothing. Needs only Xcode, not the devshell.
+# Builds a fork for the watch simulator, then checks with vtool that every object file is for
+# watchOS: SwiftPM ignores `-Xswiftc -target` and reports success on a macOS build. Needs only
+# Xcode.
 #
 # FORK and TARGET pick what to build, e.g. `make fork-watch-build FORK=swift-markdownkit
 # TARGET=MarkdownKit`; by default it is LispKit, which builds the MarkdownKit fork along the way.
@@ -209,12 +206,18 @@ TARGET ?= LispKit
 fork-watch-build: ## Build a fork for the watch simulator and verify the platform (FORK=, TARGET=)
 	utils/fork-watch-build/fork-watch-build.sh $(FORK) $(TARGET)
 
-# Runs DialectTests, hosted by the watch app, in a watch simulator: by default the Ultra 4
-# (SIMULATOR= takes a name or UDID). Regenerates the project first, because a new source file joins
-# its target only when the project is generated. Needs the devshell only for that regeneration.
-.PHONY: test
-test: project ## Run the app's tests in a watch simulator (SIMULATOR=)
-	SIMULATOR='$(SIMULATOR)' utils/app-test/app-test.sh
+# The app's tests run in a watchOS simulator.
+.PHONY: test unit-test smoke-test ui-test
+test: unit-test smoke-test ui-test ## Run every test: unit, smoke, then UI (SIMULATOR=)
+
+unit-test: project ## Run the unit tests in a watch simulator (SIMULATOR=)
+	SIMULATOR='$(SIMULATOR)' utils/app-test/app-test.sh unit
+
+smoke-test: project ## Run the smoke tests: the app starts and its main screens open (SIMULATOR=)
+	SIMULATOR='$(SIMULATOR)' utils/app-test/app-test.sh smoke
+
+ui-test: project ## Run the UI tests but the smoke tests, in parallel (SIMULATOR=, UI_WORKERS=)
+	SIMULATOR='$(SIMULATOR)' UI_WORKERS='$(UI_WORKERS)' utils/app-test/app-test.sh ui
 
 # -- Cleaning -------------------------------------------------------------------------------------
 

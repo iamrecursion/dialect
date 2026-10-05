@@ -4,8 +4,8 @@ import WidgetKit
 @testable import Dialect
 
 struct ComplicationTests {
-    /// Starfire, on the watch: the launch icons do not look good curved into a
-    /// corner or as a line of text, so only circular and rectangular.
+    /// The launch icons look wrong curved into a corner or as a line of text,
+    /// so they're circular and rectangular only.
     @Test func launchComplicationsAreCircularAndRectangular() {
         #expect(LaunchRequest.complicationFamilies == [.accessoryCircular, .accessoryRectangular])
     }

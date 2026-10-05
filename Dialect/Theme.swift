@@ -7,8 +7,7 @@ enum AccentSetting {
     static let key = "accentColor"
 
     /// The stored value's color, defaulted if the setting is missing or
-    /// corrupted. Before 2026-10-03 it was stored as sRGB hex, which is still
-    /// read.
+    /// corrupted. Older settings stored it as sRGB hex, which is still read.
     static func color(from stored: String) -> RGBColor {
         return RGBColor(displayP3: stored) ?? RGBColor(hex: stored) ?? .dialectGreen
     }
@@ -30,7 +29,23 @@ extension EnvironmentValues {
 /// title. The button or list row around it supplies the system's gray
 /// background.
 struct MenuRowLabel: View {
-    let item: MenuItem
+    let title: LocalizedStringResource
+    let image: Image
+
+    init(item: MenuItem) {
+        self.init(title: item.title, systemImage: item.systemImage)
+    }
+
+    /// For a row that performs an action.
+    init(title: LocalizedStringResource, systemImage: String) {
+        self.init(title: title, symbol: .system(systemImage))
+    }
+
+    /// For a row whose icon may be one of Dialect's custom symbols.
+    init(title: LocalizedStringResource, symbol: FileSymbol) {
+        self.title = title
+        self.image = symbol.image
+    }
 
     @Environment(\.dialectAccent) private var accent
 
@@ -40,11 +55,11 @@ struct MenuRowLabel: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: item.systemImage)
+            image
                 .font(.title3)
                 .foregroundStyle(accent)
                 .frame(width: iconWidth)
-            Text(item.title)
+            Text(title)
             Spacer(minLength: 0)
         }
     }

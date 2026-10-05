@@ -41,9 +41,8 @@ struct CrownSlider: View {
     /// The end bump: one strong pulse, then two lighter ones.
     private static let pulseSpacing = Duration.milliseconds(110)
 
-    /// How many times more turning a step takes than the crown gives by itself.
-    /// Starfire, on the watch: three was still "extremely touchy"; ten to try
-    /// next, tuned from there.
+    /// How many times more turning a step takes than the crown alone gives,
+    /// which is too touchy for steps this fine.
     private static let crownScale = 10.0
 
     private static let trackHeight: CGFloat = 14
@@ -78,7 +77,7 @@ struct CrownSlider: View {
             }
             .frame(height: Self.thumbSize + 8)
         }
-        // More room above the name than around the rest: the list row's own top inset is tight.
+        // More room above the name than around the rest: the list row's top inset is tight.
         .padding(.horizontal, 4)
         .padding(.top, 10)
         .padding(.bottom, 4)
@@ -100,7 +99,7 @@ struct CrownSlider: View {
         .onDisappear { engaged = false }
         .focusable(engaged)
         .focused($focused)
-        // Losing the focus some other way, such as to another slider, releases it too.
+        // Taking or releasing the crown moves the focus with it.
         .onChange(of: engaged) { focused = engaged }
         // Losing the focus some other way releases it.
         .onChange(of: focused) { if !focused && engaged { engaged = false } }
@@ -172,7 +171,7 @@ struct CrownSlider: View {
     }
 
     /// `value` to the nearest whole `step` from the range's lower end, within
-    /// the range: the crown's own value, divided back down, can be a hair off a
+    /// the range: the crown's value, divided back down, can be a hair off a
     /// step.
     nonisolated static func snapped(_ value: Double, to step: Double, in range: ClosedRange<Double>)
         -> Double
@@ -182,7 +181,7 @@ struct CrownSlider: View {
     }
 
     /// Whether moving from `old` to `new` arrives at either end of `range`: the
-    /// end bump plays on arriving, not while resting there.
+    /// end bump plays only on arriving.
     nonisolated static func reachedEnd(
         from old: Double, to new: Double, in range: ClosedRange<Double>
     ) -> Bool {
@@ -193,9 +192,8 @@ struct CrownSlider: View {
 /// Gives the crown back to the page around a slider when the slider lets it go,
 /// ensuring the crown can scroll the page again.
 ///
-/// A type rather than a bare closure, so that SwiftUI can compare it: a closure
-/// cannot be, so SwiftUI would treat every update as a change and redraw
-/// whatever reads it.
+/// A type, so that SwiftUI can compare it: it can't compare a closure, so it
+/// would treat every update as a change and redraw whatever reads it.
 struct ReturnCrownAction: Equatable {
     let perform: @MainActor () -> Void
 

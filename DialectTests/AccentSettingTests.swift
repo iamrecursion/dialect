@@ -9,7 +9,7 @@ struct AccentSettingTests {
                 == RGBColor(red: 0.5302, green: 0.8907, blue: 0.8818))
     }
 
-    /// The setting was stored as sRGB hex until 2026-10-03.
+    /// The setting's older format, sRGB hex, still reads.
     @Test func readsAnOlderHexColor() {
         #expect(
             AccentSetting.color(from: "#63E6E2")

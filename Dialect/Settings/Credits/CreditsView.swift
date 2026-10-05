@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Settings > Credits (D13): a row for each of the notice's sections, then the
-/// Apache License 2.0.
+/// Settings > Credits: a row for each of the notice's sections, then the Apache
+/// License 2.0.
 struct CreditsView: View {
     /// Parsed once, the first time Credits opens.
     private static let pages = NoticeDocument.creditsPages(in: .main)

@@ -3,7 +3,7 @@ import Testing
 
 @testable import Dialect
 
-/// The files the Credits screen reads must ship in the app bundle (D13).
+/// The files the Credits screen reads must ship in the app bundle.
 struct BundleTests {
     @Test func bundlesTheNotice() throws {
         let url = try #require(Bundle.main.url(forResource: "NOTICE-dialect", withExtension: "md"))
@@ -15,9 +15,9 @@ struct BundleTests {
         #expect(try String(contentsOf: url, encoding: .utf8).contains("Apache License"))
     }
 
-    /// The real files, parsed: catches the notice and the parser drifting
-    /// apart. The counts are the notice's own: 14 Swift packages, 109
-    /// third-party libraries, nine license texts.
+    /// Parses the real files, so the notice and the parser can't drift apart.
+    /// The notice has 14 Swift packages, 109 third-party libraries and nine
+    /// license texts.
     @Test func parsesTheBundledCredits() throws {
         let pages = try #require(NoticeDocument.creditsPages(in: .main))
         #expect(

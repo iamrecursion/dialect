@@ -33,8 +33,8 @@ struct DownloadsComplicationView: View {
                     .tint(green)
                 }
         default:
-            // The with the count laid over its exact center: on a face, the gauge's own labels
-            // pushed the count off center.
+            // The count is laid over the gauge's exact center: on a face, the gauge's labels pushed
+            // it off center.
             Gauge(value: snapshot.gaugeValue) {
                 EmptyView()
             }

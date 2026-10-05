@@ -6,8 +6,8 @@ options:
     watchOS: "27.0"
     iOS: "27.0"
   createIntermediateGroups: true
-  # Sources are picked up by globbing the directory below, so adding a file means creating it --
-  # project.yml only needs editing when a *target* changes.
+  # Sources are globbed from the directory below, so project.yml needs editing only when a target
+  # changes.
   generateEmptyDirectories: true
 
 # Developer-specific settings that must survive project regeneration without being committed. See
@@ -21,13 +21,13 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
-    # D10: the app builds in Swift 6 language mode. The LispKit fork stays on Swift 5, with the
-    # unsafe containment confined to one audited file.
+    # The app builds in Swift 6 language mode. The LispKit fork stays on Swift 5, with the unsafe
+    # containment confined to one audited file.
     SWIFT_STRICT_CONCURRENCY: complete
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 
-# LispKit, through Dialect's fork (A), which builds for watchOS. Its own dependencies are pinned in
-# the fork's Package.resolved and fetched on a fresh checkout's first build.
+# LispKit, through Dialect's fork, which builds for watchOS. Its dependencies are pinned in the
+# fork's Package.resolved and fetched on a fresh checkout's first build.
 packages:
   LispKit:
     path: External/swift-lispkit
@@ -39,11 +39,11 @@ targets:
     sources:
       - path: Dialect
       # One Icon Composer file serves both apps: it declares circles for watchOS and squares for
-      # everything else, and the asset compiler renders each app's own from it. XcodeGen treats a
+      # everything else, and the asset compiler renders each app's icon from it. XcodeGen treats a
       # directory with an extension as a single file, so this needs no fileTypes override.
       - path: assets/Dialect.icon
-      # The Credits screen reads these at runtime, so the app shows the files themselves and cannot
-      # drift from them (D13).
+      # The Credits screen reads these at runtime, so it shows the files themselves and can't drift
+      # from them.
       - path: NOTICE-dialect.md
         buildPhase: resources
       - path: LICENSE
@@ -59,7 +59,7 @@ targets:
           - CFBundleURLName: com.iamrecursion.dialect.watch
             CFBundleURLSchemes:
               - dialect
-    # The complications, embedded in the app (D24's companion embeds the app in turn).
+    # The complications, embedded in the app, which the iOS companion embeds in turn.
     dependencies:
       - target: DialectWidgets
         embed: true
@@ -73,18 +73,17 @@ targets:
         - DialectUITests
     settings:
       base:
-        # `com.iamrecursion.dialect` is RESERVED for the iOS companion (sub-project D): a watch
-        # app's bundle ID must be prefixed by its companion's. Taking `.watch` now costs nothing --
-        # a bundle ID is permanent identity once shipped, and renaming later would orphan every
-        # existing install. Not `.watchkitapp`: that suffix was a WatchKit-extension-era convention,
-        # never a rule, and a suffix-free ID was verified to install on watchOS 27.
+        # `com.iamrecursion.dialect` is reserved for the iOS companion, as a watch app's bundle ID
+        # must be prefixed by its companion's. A bundle ID is permanent once shipped: renaming it
+        # would orphan every install. `.watchkitapp` was only a WatchKit-extension convention; this
+        # ID installs on watchOS 27.
         PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect.watch
         # The `.icon` file's name, without the extension. No asset catalog is needed.
         ASSETCATALOG_COMPILER_APPICON_NAME: Dialect
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_WKApplication: YES
-        # The watch app has a companion counterpart, which is what makes WCSession usable at all
-        # (D24). It still installs and runs independently -- the companion is optional per D1.
+        # The companion counterpart makes WCSession usable. The watch app still installs and runs
+        # without the companion.
         INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.iamrecursion.dialect
         INFOPLIST_KEY_CFBundleDisplayName: Dialect
         CODE_SIGN_STYLE: Automatic
@@ -112,7 +111,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
 
   # The app's unit tests, hosted by the watch app: `Bundle.main` is the app's bundle, so tests see
-  # its resources. Run them with `make test`.
+  # its resources. Run them with `make unit-test`.
   DialectTests:
     type: bundle.unit-test
     platform: watchOS
@@ -151,8 +150,7 @@ targets:
         embed: true
     settings:
       base:
-        # Reserved for the companion since the watch app's ID must be prefixed by it. See D24 and
-        # the watch target above.
+        # The watch app's ID is prefixed by this one; see the watch target above.
         PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect
         ASSETCATALOG_COMPILER_APPICON_NAME: Dialect
         GENERATE_INFOPLIST_FILE: YES

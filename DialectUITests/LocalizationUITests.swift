@@ -1,7 +1,7 @@
 import XCTest
 
 /// The app in British English and in US English: the system picks the spelling
-/// from the wearer's language (here set by `-AppleLanguages`).
+/// from the user's language (here set by `-AppleLanguages`).
 @MainActor
 final class LocalizationUITests: XCTestCase {
     private var app: XCUIApplication!

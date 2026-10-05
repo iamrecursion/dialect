@@ -3,12 +3,11 @@ import Testing
 
 @testable import Dialect
 
-/// British spelling for wearers whose language is British English and its kin;
+/// British spelling for users whose language is British English and its kin;
 /// US English, the source, for everyone else. The system picks the
 /// localization; these check what each one holds.
 struct LocalizationTests {
-    /// Starfire's list. Each needs its own localization: none falls back to
-    /// `en-GB` by itself.
+    /// Each needs its own localization: none falls back to `en-GB` by itself.
     static let british = ["en-GB", "en-AU", "en-NZ", "en-IE", "en-IN"]
 
     @Test(arguments: british)
@@ -25,6 +24,11 @@ struct LocalizationTests {
         #expect(
             bundle.localizedString(forKey: "Use a hex color like %@", value: nil, table: nil)
                 == "Use a hex colour like %@")
+        // The Trash is the Bin.
+        #expect(bundle.localizedString(forKey: "Trash", value: nil, table: nil) == "Bin")
+        #expect(
+            bundle.localizedString(forKey: "Empty Trash After", value: nil, table: nil)
+                == "Empty Bin After")
     }
 
     private func localization(_ identifier: String) -> Bundle? {

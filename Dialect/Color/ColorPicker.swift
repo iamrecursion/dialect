@@ -1,14 +1,14 @@
 import SwiftUI
 
 /// Chooses a color: a preview, swatches, hue, saturation and brightness
-/// sliders, a hex field (sRGB, as hex is everywhere else) and a reset. It does
-/// not know where the color is stored: it edits a binding.
+/// sliders, a hex field (sRGB, as hex is everywhere) and a reset. It edits a
+/// binding, so it doesn't know where the color is stored.
 ///
-/// While it is on screen the sliders keep their own hue, saturation and
-/// brightness, and the color follows the settings. Deriving them from the color
-/// each time would make them jitter (each component is rounded) and would lose
-/// the hue of a gray. A swatch, a hex value or a reset sets the color, and the
-/// sliders are derived from it as a one-off.
+/// While on screen, the sliders keep their hue, saturation and brightness, and
+/// the color follows them. Deriving them from the color each time would make
+/// them jitter (each component is rounded) and lose a gray's hue. A swatch, a
+/// hex value or a reset sets the color, and the sliders are derived from it
+/// once.
 struct ColorPicker<Preview: View>: View {
     @Binding var color: RGBColor
 
@@ -22,9 +22,9 @@ struct ColorPicker<Preview: View>: View {
     /// The slider that has the crown, if any: one at a time.
     @State private var engaged: WritableKeyPath<HSB, Double>?
 
-    /// The sliders' values; `nil` until first shown. Whether the page has the
-    /// crown, so that it scrolls when no slider is taking it.
+    /// Whether the page has the crown, so it scrolls when no slider takes it.
     @FocusState private var pageHasCrown: Bool
+    /// The sliders' values; `nil` until first shown.
     @State private var sliders: HSB?
     @State private var hexText = ""
     @State private var hexRejected = false
@@ -206,7 +206,7 @@ private struct HexDifference: View {
             }
             .ignoresSafeArea(.container, edges: .top)
         }
-        // Okay is the way out, as in a notification, so not the system's close button too.
+        // Okay is the way out, as in a notification, so there's no close button.
         .toolbar(.hidden, for: .navigationBar)
     }
 

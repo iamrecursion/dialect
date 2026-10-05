@@ -10,7 +10,7 @@ import Foundation
 /// display of the notices.
 struct NoticeDocument: Hashable, Sendable {
     /// The `##` sections, in order. The `#` heading and the introduction under
-    /// it are dropped as they describe the file, not the software.
+    /// it are dropped as they describe the file.
     var sections: [NoticeSection]
 }
 
@@ -114,7 +114,7 @@ extension NoticeDocument {
     }
 
     /// Splits the lines at headings. A closed code block is kept whole, so a
-    /// `#` line inside one is text, not a heading.
+    /// `#` line inside one stays text.
     private static func chunks(_ lines: [String]) -> [Chunk] {
         var chunks = [Chunk(level: 1, title: "", body: [])]
         var index = 0
@@ -206,9 +206,8 @@ extension NoticeDocument {
         }
     }
 
-    /// `[text](destination)` becomes `text`: the notice's in-file anchors
-    /// cannot work in the app, and the screen has no reason to leave it for the
-    /// web.
+    /// `[text](destination)` becomes `text`: the notice's in-file anchors can't
+    /// work in the app, and Credits doesn't link out to the web.
     private static func withoutLinks(_ text: String) -> String {
         return text.replacing(/\[([^\]]*)\]\([^)]*\)/) { String($0.output.1) }
     }

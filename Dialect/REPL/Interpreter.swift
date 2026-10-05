@@ -46,8 +46,8 @@ final class Interpreter: @unchecked Sendable {
         thread.start()
     }
 
-    /// Boots the context now rather than on the first entry, so that entry does not wait for it;
-    /// returns whether Scheme started. Booting twice is a no-op.
+    /// Boots the context now, so the first entry doesn't wait for it; returns
+    /// whether Scheme started. Booting twice is a no-op.
     func warmUp() async -> Bool {
         return await withCheckedContinuation { continuation in
             enqueue { [self] in continuation.resume(returning: bootIfNeeded() != nil) }

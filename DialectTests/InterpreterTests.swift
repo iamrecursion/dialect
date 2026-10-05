@@ -26,7 +26,7 @@ struct InterpreterTests {
     @Test func keepsDefinitionsFromOneEntryToTheNext() async {
         let interpreter = Interpreter()
         defer { interpreter.stop() }
-        // LispKit's `define` returns the symbol it defined, as its own REPL shows.
+        // LispKit's `define` returns the symbol it defined, as its REPL shows.
         #expect(await interpreter.evaluate("(define x 41)").result == .value("x"))
         #expect(await interpreter.evaluate("(+ x 1)").result == .value("42"))
     }

@@ -42,14 +42,13 @@ final class LaunchRouter {
     }
 
     /// The navigation path a launch leaves: its screen alone, over the menu, so
-    /// going back returns to the menu rather than to wherever the app was
-    /// before.
+    /// going back returns to the menu.
     static func path(for request: LaunchRequest, hasLatestSession: Bool) -> [Route] {
         return [request.route(hasLatestSession: hasLatestSession)]
     }
 }
 
-/// Stands in for the session store until sessions exist (B): whether there is a
+/// Stands in for the session store until sessions exist: whether there is a
 /// latest session to resume is a debug setting, so both outcomes can be tried
 /// on the watch.
 enum FakeSessions {

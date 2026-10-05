@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Every destination in the app. Buttons push routes onto the navigation stack;
-/// the Action Button will later open a session the same way (D12).
+/// the Action Button will later open a session the same way.
 enum Route: Hashable {
     case newREPL
     case resumeSession
@@ -14,11 +14,57 @@ enum Route: Hashable {
     case appearanceSettings
     case runtimeSettings
     case fileSettings
+    case textExtensions
     case downloaderSettings
     case companionSettings
     case accentColor
     case credits
     case creditsPage(NoticeSection)
+
+    // Files. `.files` is the root folder; everything below it is named by its path.
+    /// A folder, or a session entered as one.
+    case folder(FilePath)
+
+    /// A session opened, which shows a placeholder until the REPL can open it.
+    case session(FilePath)
+    case itemMore(FilePath)
+    case folderMore(FilePath)
+    case sort(FilePath)
+    case group(FilePath)
+    case folderInfo(FilePath)
+    case extendedInfo(FilePath)
+
+    /// A folder's Add and Clipboard screens.
+    case add(FilePath)
+    case clipboard(FilePath)
+
+    /// The name screen for a new session, folder or file in the folder.
+    case newItem(NewItemKind, in: FilePath)
+    case rename(FilePath)
+
+    // The bin, which is the same from every folder.
+    case bin
+    case binMore
+
+    /// A bin item's information.
+    case binItem(UUID)
+
+    /// The Files item or folder this screen is about; `nil` for the rest.
+    var filePath: FilePath? {
+        switch self {
+        case .files: return .root
+        case .folder(let path), .session(let path), .itemMore(let path), .folderMore(let path),
+            .sort(let path), .group(let path), .folderInfo(let path), .extendedInfo(let path),
+            .add(let path), .clipboard(let path), .newItem(_, let path), .rename(let path):
+            return path
+        default: return nil
+        }
+    }
+
+    /// The route that shows a folder: Files itself for the root.
+    static func folderRoute(for folder: FilePath) -> Route {
+        return folder == .root ? .files : .folder(folder)
+    }
 
     /// The title of a destination not built yet, which shows a placeholder;
     /// `nil` for real screens.
@@ -26,15 +72,18 @@ enum Route: Hashable {
         switch self {
         case .resumeSession: return "Resume Session"
         case .sessions: return "History"
-        case .files: return "Files"
         case .downloader: return "Downloader"
         case .editorSettings: return "Editor"
         case .sessionSettings: return "Sessions"
         case .runtimeSettings: return "Runtime"
-        case .fileSettings: return "Files"
         case .downloaderSettings: return "Downloader"
         case .companionSettings: return "Companion"
-        case .newREPL, .settings, .appearanceSettings, .accentColor, .credits, .creditsPage:
+        case .clipboard: return "Clipboard"
+        case .newREPL, .settings, .appearanceSettings, .fileSettings, .textExtensions,
+            .accentColor, .credits, .creditsPage:
+            return nil
+        case .files, .folder, .session, .itemMore, .folderMore, .sort, .group, .folderInfo,
+            .extendedInfo, .add, .newItem, .rename, .bin, .binMore, .binItem:
             return nil
         }
     }
@@ -44,9 +93,26 @@ enum Route: Hashable {
         case .newREPL: REPLView()
         case .settings: SettingsView()
         case .appearanceSettings: AppearanceView()
+        case .fileSettings: FileSettingsView()
+        case .textExtensions: TextExtensionsView()
         case .accentColor: AccentColorView()
         case .credits: CreditsView()
         case .creditsPage(let page): CreditsPageView(page: page)
+        case .files: FolderScreen(path: .root)
+        case .folder(let path): FolderScreen(path: path)
+        case .session(let path): SessionPlaceholder(path: path)
+        case .itemMore(let path): ItemMoreScreen(path: path)
+        case .folderMore(let path): FolderMoreScreen(path: path)
+        case .sort(let path): SortScreen(path: path)
+        case .group(let path): GroupScreen(path: path)
+        case .folderInfo(let path): FolderInfoScreen(path: path)
+        case .extendedInfo(let path): ExtendedInfoScreen(path: path)
+        case .add(let folder): AddScreen(folder: folder)
+        case .newItem(let kind, let folder): NameScreen(purpose: .create(kind, in: folder))
+        case .rename(let path): NameScreen(purpose: .rename(path))
+        case .bin: BinScreen()
+        case .binMore: BinMoreScreen()
+        case .binItem(let id): BinItemScreen(id: id)
         default: Placeholder(title: placeholderTitle ?? "")
         }
     }
@@ -54,15 +120,19 @@ enum Route: Hashable {
 
 /// A row of the menu or of Settings.
 struct MenuItem: Identifiable {
-    /// Localizable: looked up in the wearer's language, where a `String` would
-    /// be shown as is.
+    /// Localizable: looked up in the user's language, where a `String` would be
+    /// shown as is.
     let title: LocalizedStringResource
     let systemImage: String
     let route: Route
+
     /// Moves the icon up (negative) or down, in points at the default text
     /// size, where the eye finds the glyph's center somewhere other than its
     /// bounding box does.
     var opticalOffset: CGFloat = 0
+
+    /// Grayed out: shown, but does nothing yet.
+    var isDisabled = false
 
     var id: Route { route }
 }
@@ -75,20 +145,56 @@ struct MenuItem: Identifiable {
             "downloader": .downloader, "settings": .settings, "editor": .editorSettings,
             "session-settings": .sessionSettings, "appearance": .appearanceSettings,
             "runtime": .runtimeSettings, "file-settings": .fileSettings,
+            "text-extensions": .textExtensions,
             "downloader-settings": .downloaderSettings, "companion": .companionSettings,
-            "accent-color": .accentColor, "credits": .credits,
+            "accent-color": .accentColor, "credits": .credits, "trash": .bin,
         ]
 
         /// The navigation path a debug launch argument names, so screenshots
         /// can open any screen: `-DialectPath "settings/credits/License
         /// texts/CBORCoding"`. Segments name routes (see `debugNames`) until
-        /// `credits`, then Credits pages by title. The path stops at the first
-        /// segment that names nothing.
+        /// `credits`, then Credits pages by title.
+        ///
+        /// `folder:` takes the rest of the path as a folder below Files' root,
+        /// as in `files/folder:scripts/lib`, with a route for each level;
+        /// `more:` takes the rest as an item, and ends on its More screen, as
+        /// in `more:notes/todo.txt`. `add` is Add for the folder the path has
+        /// reached, and `new-session`, `new-folder` and `new-file` its name
+        /// screens, so they come before any `folder:`. The path stops at the
+        /// first segment that doesn't name anything.
         static func debugPath(_ spec: String, creditsPages: [NoticeSection]?) -> [Route] {
             var path: [Route] = []
+
             // Set once the path reaches Credits: the pages the next segment can name.
             var pages: [NoticeSection]?
-            for segment in spec.split(separator: "/").map(String.init) {
+
+            let segments = spec.split(separator: "/").map(String.init)
+            for (index, segment) in segments.enumerated() {
+                for prefix in ["folder:", "more:"] where segment.hasPrefix(prefix) {
+                    if path.last != .files { path.append(.files) }
+                    var names =
+                        ([String(segment.dropFirst(prefix.count))] + segments[(index + 1)...])
+                        .filter { !$0.isEmpty }
+                    // `more:` ends on the item's More screen, over the folders it's in.
+                    let item = prefix == "more:" ? names.popLast() : nil
+                    var folder = FilePath.root
+                    for name in names {
+                        folder = folder.appending(name)
+                        path.append(.folder(folder))
+                    }
+                    if let item { path.append(.itemMore(folder.appending(item))) }
+                    return path
+                }
+                if segment == "add" && pages == nil {
+                    path.append(.add(path.last?.filePath ?? .root))
+                    continue
+                }
+                if segment.hasPrefix("new-"), pages == nil,
+                    let kind = NewItemKind(rawValue: String(segment.dropFirst("new-".count)))
+                {
+                    path.append(.newItem(kind, in: path.last?.filePath ?? .root))
+                    continue
+                }
                 if let candidates = pages {
                     guard let page = candidates.first(where: { $0.title == segment }) else { break }
                     path.append(.creditsPage(page))

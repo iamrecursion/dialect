@@ -17,9 +17,9 @@ final class REPLSession {
     /// What is being typed.
     var draft = ""
 
-    /// Made when the session starts or is first used, not with the session:
-    /// SwiftUI can make a view's initial state more than once and keep only the
-    /// first, and each interpreter is a thread and, once booted, a context.
+    /// Made when the session starts or is first used: SwiftUI can make a view's
+    /// initial state more than once and keep only the first, and each
+    /// interpreter is a thread and, once booted, a context.
     private var interpreter: Interpreter?
 
     var isStarted: Bool { interpreter != nil }

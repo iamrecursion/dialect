@@ -3,7 +3,7 @@ import UIKit
 
 @testable import Dialect
 
-/// The spec's tables: titles, SF Symbols and destinations, in order.
+/// The menus' titles, SF Symbols and destinations, in order.
 @MainActor
 struct NavigationTests {
     @Test func topRow() {
@@ -62,10 +62,11 @@ struct NavigationTests {
     @Test func placeholderTitles() {
         let expected: [(Route, String)] = [
             (.resumeSession, "Resume Session"), (.sessions, "History"),
-            (.files, "Files"), (.editorSettings, "Editor"), (.sessionSettings, "Sessions"),
+            (.editorSettings, "Editor"), (.sessionSettings, "Sessions"),
             (.runtimeSettings, "Runtime"),
+            (.clipboard(.root), "Clipboard"),
             (.companionSettings, "Companion"), (.downloader, "Downloader"),
-            (.fileSettings, "Files"), (.downloaderSettings, "Downloader"),
+            (.downloaderSettings, "Downloader"),
         ]
         for (route, title) in expected {
             #expect(route.placeholderTitle?.key == title)
@@ -75,6 +76,11 @@ struct NavigationTests {
         #expect(Route.credits.placeholderTitle == nil)
         #expect(Route.appearanceSettings.placeholderTitle == nil)
         #expect(Route.accentColor.placeholderTitle == nil)
+        #expect(Route.fileSettings.placeholderTitle == nil)
+        #expect(Route.files.placeholderTitle == nil)
+        #expect(Route.itemMore(.root).placeholderTitle == nil)
+        #expect(Route.add(.root).placeholderTitle == nil)
+        #expect(Route.bin.placeholderTitle == nil)
     }
 
     @Test func appearanceRows() {
@@ -82,5 +88,61 @@ struct NavigationTests {
         #expect(AppearanceView.rows.map(\.systemImage) == ["swatchpalette"])
         #expect(AppearanceView.rows.map(\.route) == [.accentColor])
         #expect(UIImage(systemName: "swatchpalette") != nil)
+    }
+
+    /// The folder screen's buttons. Clipboard is disabled until it has a
+    /// screen.
+    @Test func folderButtons() {
+        let notes = FilePath(components: ["notes"])
+        let buttons = FolderScreen.buttons(for: notes)
+        #expect(buttons.map(\.title.key) == ["Add", "Clipboard", "More"])
+        #expect(
+            buttons.map(\.systemImage) == ["plus.capsule", "list.clipboard", "ellipsis.circle"])
+        #expect(buttons.map(\.route) == [.add(notes), .clipboard(notes), .folderMore(notes)])
+        #expect(buttons.map(\.isDisabled) == [false, true, false])
+        // The clipboard's clip sticks up above its board, which then sits about 1.5 pt low beside
+        // its neighbors (measured on the 42 mm and Ultra screenshots).
+        #expect(buttons.map(\.opticalOffset) == [0, -1.5, 0])
+        for item in buttons {
+            #expect(UIImage(systemName: item.systemImage) != nil, "\(item.systemImage)")
+        }
+    }
+
+    /// A folder's More screen's items, in order.
+    @Test func folderMoreItems() {
+        #expect(
+            FolderMoreScreen.Action.allCases.map(\.systemImage) == [
+                "arrow.up.arrow.down", "square.grid.3x1.below.line.grid.1x2", "eye",
+                "info.circle", "trash", "trash.fill", "gear",
+            ])
+        #expect(
+            FolderMoreScreen.Action.allCases.map(\.title.key) == [
+                "Sort", "Group", "Show Hidden", "Folder Info", "Delete", "Trash", "Settings",
+            ])
+        for action in FolderMoreScreen.Action.allCases {
+            #expect(UIImage(systemName: action.systemImage) != nil, "\(action.systemImage)")
+        }
+        #expect(UIImage(systemName: "eye.slash") != nil)
+        #expect(UIImage(systemName: "info.circle") != nil)
+    }
+
+    /// Add's items, and the bin's buttons and icons.
+    @Test func addAndBinSymbols() {
+        #expect(AddScreen.items.map(\.kind) == [.session, .folder, .file])
+        #expect(BinScreen.buttons.map(\.title.key) == ["Select", "More"])
+        #expect(BinScreen.buttons.map(\.isDisabled) == [true, false])
+        for name in [
+            "folder", "document", "checkmark.circle.badge.plus", BinSymbol.restore,
+            "rectangle.and.pencil.and.ellipsis", "trash", "trash.fill",
+        ] {
+            #expect(UIImage(systemName: name) != nil, "\(name)")
+        }
+        #expect(UIImage(named: FileSymbol.deletePermanently.name) != nil)
+        #expect(UIImage(named: "session") != nil)
+    }
+
+    @Test func dateStyles() {
+        #expect(DateStyle.allCases.map(\.title.key) == ["System", "ISO"])
+        #expect(DateStyle.allCases.map(\.rawValue) == ["system", "iso"])
     }
 }

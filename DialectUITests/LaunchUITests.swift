@@ -3,8 +3,8 @@ import XCTest
 /// The `dialect://launch/…` links that complications open: each lands on its
 /// screen, over the menu, wherever the app was. The links arrive through the
 /// debug `-DialectOpenURL` argument, which feeds the same handler as
-/// `onOpenURL`: watchOS will not open a third-party scheme from outside the
-/// app, so `XCUIApplication.open` cannot deliver them.
+/// `onOpenURL`: watchOS won't open a third-party scheme from outside the app,
+/// so `XCUIApplication.open` can't deliver them.
 @MainActor
 final class LaunchUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -44,9 +44,8 @@ final class LaunchUITests: XCTestCase {
     }
 
     /// A finger tap on the REPL's input field opens the system's text input.
-    /// (Tapping the field's element, as `XCUIElement.tap` does, can succeed
-    /// where a finger does not: Starfire found the pinned field untappable on
-    /// the watch while such a test still passed.)
+    /// `XCUIElement.tap` can reach the pinned field where a finger can't, so
+    /// this taps where a finger lands.
     func testTappingTheREPLsFieldOpensTextInput() {
         launch(["-DialectOpenURL", "dialect://launch/new"])
         XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 5))

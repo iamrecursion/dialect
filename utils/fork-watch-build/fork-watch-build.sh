@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# Builds a target of one of Dialect's forks for the watchOS simulator, then proves that the result
-# really is a watchOS build.
+# Builds a target of one of Dialect's forks for the watchOS simulator, then checks that the result
+# is a watchOS build.
 #
-# SwiftPM silently ignores `-Xswiftc -target` and reports success on a macOS build, so a green
-# `swift build` says nothing about the platform. This builds through a destination file, which
-# SwiftPM does honour, and then checks every object file in its products with `vtool`: if any is
-# not WATCHOSSIMULATOR the run fails, however the build itself went.
+# SwiftPM silently ignores `-Xswiftc -target` and reports success on a macOS build. This builds
+# through a destination file, which SwiftPM honors, then checks every object file in its products
+# with `vtool`: if any isn't WATCHOSSIMULATOR, the run fails.
 #
 # Usage: fork-watch-build.sh [FORK [TARGET]]    (default: swift-lispkit LispKit)
 #
-# FORK is a directory under External/. Building LispKit builds the MarkdownKit fork too, since
-# LispKit depends on it by path, but it can also be built on its own: `swift-markdownkit MarkdownKit`.
+# FORK is a directory under External/. Building LispKit builds the MarkdownKit fork too, as LispKit
+# depends on it by path; it also builds alone: `swift-markdownkit MarkdownKit`.
 
 set -euo pipefail
 
@@ -21,8 +20,8 @@ target="${2:-LispKit}"
 # The package's watchOS floor, as its manifest declares it. The app itself targets watchOS 27.
 triple="arm64-apple-watchos10.0-simulator"
 
-# A submodule that is not checked out is an empty directory, which SwiftPM would reject with a far
-# less helpful message.
+# A submodule that isn't checked out is an empty directory, which SwiftPM rejects with a less
+# helpful message.
 if [[ ! -e "$fork/.git" ]]; then
     echo "fork-watch-build: $fork is not checked out; run \`make submodules\`." >&2
     exit 1

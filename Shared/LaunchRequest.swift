@@ -41,7 +41,7 @@ enum LaunchRequest: String, Hashable, Sendable, CaseIterable {
     }
 
     /// How far to nudge its symbol up (negative) or down, in points at
-    /// `.title3`, where the eye finds its centre somewhere other than its
+    /// `.title3`, where the eye finds its center somewhere other than its
     /// bounding box does: `square.and.pencil`'s pencil tip sticks up above its
     /// square.
     var opticalOffset: Double {

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// A color as Dialect stores it: Display P3, the watch's own color space, so a
+/// A color as Dialect stores it: Display P3, the watch's color space, so a
 /// color can be more vivid than sRGB allows.
 ///
 /// Hex is conventionally sRGB so a hex color is converted into Display P3, and
@@ -28,8 +28,8 @@ struct RGBColor: Hashable, Sendable {
         self.blue = component(blue)
     }
 
-    /// Dialect's green, `display-p3(0.57, 0.78, 0.50)` as first chosen. It is
-    /// inside sRGB, where it is `#81C977`.
+    /// Dialect's green, `display-p3(0.57, 0.78, 0.50)`; sRGB has it as
+    /// `#81C977`.
     static let dialectGreen = RGBColor(red: 0.57, green: 0.78, blue: 0.50)
 
     /// The color picker's swatches: the default first, then the rest by hue.
@@ -165,8 +165,7 @@ extension RGBColor {
     }
 
     /// Hue, saturation and brightness, each in `0...1`. A gray or black has no
-    /// hue of its own, so it takes `fallbackHue` (and a black keeps saturation
-    /// 0).
+    /// hue, so it takes `fallbackHue` (and a black keeps saturation 0).
     func hsb(fallbackHue: Double) -> HSB {
         let (r, g, b) = (red, green, blue)
         let maximum = max(r, g, b)
@@ -193,7 +192,7 @@ extension RGBColor {
     }
 
     /// Relative luminance, as WCAG defines it for sRGB, but from Display P3's
-    /// own primaries, so it holds beyond sRGB too.
+    /// primaries, so it holds beyond sRGB too.
     private var luminance: Double {
         let linear = ColorSpace.linear((red, green, blue))
         let y = ColorSpace.p3Luminance

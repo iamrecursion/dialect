@@ -4,8 +4,8 @@ import WidgetKit
 
 /// The launch actions as controls, for Control Center and the Action Button.
 ///
-/// Each runs its intent, which opens the app; where a control goes is the
-/// wearer's choice.
+/// Each runs its intent, which opens the app; the user chooses where each
+/// control goes.
 struct ResumeOrNewControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.iamrecursion.dialect.watch.resume-or-new") {

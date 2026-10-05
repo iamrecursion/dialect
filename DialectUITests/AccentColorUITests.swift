@@ -9,7 +9,7 @@ final class AccentColorUITests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        // Straight to the picker, and from the default whatever an earlier run left.
+        // The picker, with default settings whatever an earlier run saved.
         app.launchArguments = [
             "-DialectPath", "settings/appearance/accent-color", "-DialectResetSettings", "YES",
         ]
@@ -34,9 +34,8 @@ final class AccentColorUITests: XCTestCase {
     /// The warning beside a hex value that is only the nearest to the color.
     private static let notExact = "Hex Not Exact"
 
-    /// A color beyond sRGB shows the nearest hex, with a warning. Tapping it
-    /// brings up an explanation comparing the two, like a notification, which
-    /// Okay dismisses (Starfire).
+    /// A color beyond sRGB shows the nearest hex, with a warning. Tapping the
+    /// warning shows an explanation comparing the two, which Okay dismisses.
     func testAColorBeyondSRGBShowsTheNearestHex() {
         launchWithAColorBeyondSRGB()
         XCTAssertTrue(hexField(showing: "#FF0000"), "no nearest hex")
@@ -65,14 +64,14 @@ final class AccentColorUITests: XCTestCase {
     /// Display P3's red, which sRGB does not have.
     private func launchWithAColorBeyondSRGB() {
         app.terminate()
-        // Quoted, or the argument would be read as a property list. (A setting passed this way is
-        // pinned for the run, which is fine here: nothing changes it.)
+        // Quoted, as an unquoted argument is read as a property list. A setting passed this way is
+        // pinned for the run; nothing here changes it.
         app.launchArguments += ["-accentColor", "\"color(display-p3 1 0 0)\""]
         app.launch()
     }
 
-    /// A tap where a finger would land: the middle of the element, as on
-    /// screen. (`XCUIElement.tap` can reach an element a finger cannot.)
+    /// A tap where a finger lands: the middle of the element on screen.
+    /// `XCUIElement.tap` can reach an element a finger can't.
     private func fingerTap(_ element: XCUIElement) {
         let frame = element.frame
         let screen = app.frame
@@ -82,11 +81,9 @@ final class AccentColorUITests: XCTestCase {
         ).tap()
     }
 
-    /// The crown moves a slider slowly enough to dial a value in: Starfire
-    /// found it too fast on the watch, still "extremely touchy" at three times
-    /// slower. Unscaled, 0.3 of a turn moved the hue about 145° here; at three
-    /// times, about 41°; at ten, it should be about 15°. The limit leaves room
-    /// for simulated turns varying from run to run.
+    /// The crown moves a slider slowly enough to dial a value in: 0.3 of a turn
+    /// moves the hue about 15°, a tenth of the unscaled 145°. The limit allows
+    /// for simulated turns varying between runs.
     func testTheCrownMovesASliderSlowly() throws {
         let hue = hueSlider()
         hue.tap()
@@ -97,8 +94,7 @@ final class AccentColorUITests: XCTestCase {
         XCTAssertLessThanOrEqual(moved, 25, "the crown moved the hue \(moved)° for 0.3 of a turn")
     }
 
-    /// Only one slider has the crown at a time: tapping another takes it over
-    /// (Starfire found two focused at once on the watch).
+    /// Only one slider has the crown at a time: tapping another takes it over.
     func testOnlyOneSliderHasTheCrown() throws {
         let hue = hueSlider()
         let saturation = app.descendants(matching: .any)
@@ -139,8 +135,8 @@ final class AccentColorUITests: XCTestCase {
         return try XCTUnwrap(Int(text.split(separator: " ")[0]))
     }
 
-    /// A new accent reaches the rest of the app at once, not only after a
-    /// relaunch: the menu's icons are drawn in it as soon as you go back.
+    /// A new accent reaches the rest of the app at once: the menu's icons use
+    /// it as soon as you go back.
     func testANewAccentReachesTheMenu() throws {
         app.buttons["Red"].tap()
         for _ in 0..<3 {
@@ -178,7 +174,7 @@ final class AccentColorUITests: XCTestCase {
     /// Tapping a slider gives it the crown; tapping it again hands the crown
     /// back to the page.
     func testTappingASliderGivesAndTakesTheCrown() {
-        // The slider, not its title text: the one whose value is in degrees.
+        // The slider is the element whose value is in degrees.
         let hue = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label == 'Hue' AND value ENDSWITH ' degrees'"))
             .firstMatch
@@ -209,8 +205,8 @@ final class AccentColorUITests: XCTestCase {
         XCTAssertNotEqual(hue.frame.minY, afterCrown, "a finger did not scroll the page")
     }
 
-    /// A short, slow vertical drag, held at its end so the list does not fling
-    /// on, as fractions of the screen's height.
+    /// A short, slow vertical drag between fractions of the screen's height,
+    /// held at its end so the list doesn't fling.
     private func drag(from start: CGFloat, to end: CGFloat) {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: start))
             .press(

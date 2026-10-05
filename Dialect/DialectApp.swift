@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct DialectApp: App {
-    @State private var path = Self.initialPath
+    @State private var navigation = Navigation(path: Self.initialPath)
     @State private var router = LaunchRouter.shared
     @AppStorage(AccentSetting.key) private var accent = RGBColor.dialectGreen.displayP3
 
@@ -15,6 +15,7 @@ struct DialectApp: App {
             {
                 UserDefaults.standard.removePersistentDomain(forName: domain)
             }
+
             // For UI tests: a link as if a complication had opened it. watchOS will not open a
             // third-party scheme from outside the app (`simctl openurl`, `XCUIApplication.open`
             // both fail), but a complication's link reaches `onOpenURL` directly.
@@ -23,18 +24,41 @@ struct DialectApp: App {
             {
                 LaunchRouter.shared.open(url)
             }
+
+            // For UI tests and screenshots: Files shows a fresh sample tree instead of Documents,
+            // with separate stores.
+            if UserDefaults.standard.bool(forKey: SeedFiles.argument) {
+                do {
+                    try SeedFiles.build(at: SeedFiles.root, stores: SeedFiles.stores)
+                    FilesRoot.url = SeedFiles.root
+                    FilesStores.url = SeedFiles.stores
+                    FilesRoot.operations = FileOperations(
+                        root: SeedFiles.root, stores: SeedFiles.stores)
+                } catch {
+                    assertionFailure("Couldn't build the sample files: \(error)")
+                }
+            }
         #endif
+
+        // Whatever was being made when Dialect last stopped is abandoned.
+        let operations = FilesRoot.operations
+        let emptyTrashAfter = FileSettings.emptyTrashAfter()
+        Task(priority: .background) {
+            await operations.clearStaging()
+            await operations.removeExpired(after: emptyTrashAfter)
+        }
     }
 
     var body: some Scene {
         WindowGroup {
-            NavigationStack(path: $path) {
-                MainMenu(path: $path)
+            NavigationStack(path: $navigation.path) {
+                MainMenu(path: $navigation.path)
                     .navigationDestination(for: Route.self) { route in
                         route.destination
                     }
             }
             .environment(\.dialectAccent, Color(AccentSetting.color(from: accent)))
+            .environment(navigation)
             .onOpenURL { router.open($0) }
             .onChange(of: router.pending, initial: true) { followLaunch() }
         }
@@ -43,7 +67,8 @@ struct DialectApp: App {
     /// Goes where a launch request asks, if one is waiting.
     private func followLaunch() {
         guard let request = router.take() else { return }
-        path = LaunchRouter.path(for: request, hasLatestSession: FakeSessions.hasLatestSession())
+        navigation.path = LaunchRouter.path(
+            for: request, hasLatestSession: FakeSessions.hasLatestSession())
     }
 
     /// Empty, except in a debug build launched with `-DialectPath` (see

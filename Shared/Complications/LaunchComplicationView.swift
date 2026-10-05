@@ -26,7 +26,7 @@ struct LaunchComplicationView: View {
                 VStack(alignment: .leading) {
                     Text(request.title)
                         .font(.headline)
-                        // Shrinks a little rather than truncating "Resume or New".
+                        // Shrinks a little so "Resume or New" fits.
                         .minimumScaleFactor(0.8)
                         .lineLimit(1)
                     Text("Dialect")

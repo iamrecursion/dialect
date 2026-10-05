@@ -6,15 +6,15 @@ Each fork is formatted in its upstream's style, and reformatting upstream's code
 rebase into a conflict. So this works from the diff between a fork and the upstream commit it is
 based on, and treats each changed Swift file according to who owns it:
 
-- a file the fork added is Dialect's own code, and gets Dialect's full treatment: swift-format
-  with Dialect's `.swift-format`, then the comment reflow over the whole file;
+- a file the fork added is Dialect's code, and gets swift-format with Dialect's `.swift-format`,
+  then the comment reflow over the whole file;
 - a file upstream owns has only the comments on lines the fork added refilled, via the reflow's
   `--lines`. Its code is left exactly as written, since reformatting even the lines we added
   would mix two indentation styles in one file.
 
-The base is the upstream default branch, `upstream/master` or `upstream/main`, if the fork has that
-remote, as a fork set up per CONTRIBUTING.md does. Without it the fork cannot be told apart from upstream, so this reports that and skips the
-fork, as it also does when the submodule is not checked out at all (as in CI).
+The base is the upstream default branch, `upstream/master` or `upstream/main`, when the fork has
+that remote, as CONTRIBUTING.md sets up. Without it the fork can't be told apart from upstream, so
+this reports that and skips the fork, as it does when the submodule isn't checked out (as in CI).
 """
 
 import argparse
@@ -52,8 +52,8 @@ def git(fork, *args, check=True):
 
 def fork_base(fork, upstream):
     """The upstream commit the fork's branch is based on, or None if it cannot be found."""
-    # A submodule that is not checked out is an empty directory, and `git -C` on it would
-    # silently run against Dialect's own repository instead.
+    # A submodule that isn't checked out is an empty directory, and `git -C` on it would silently
+    # run against Dialect's repository.
     if not (fork / ".git").exists():
         print(f"format-fork: {fork.name} is not checked out; skipping it.")
         return None

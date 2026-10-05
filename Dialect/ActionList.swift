@@ -3,17 +3,15 @@ import SwiftUI
 /// A list whose first row is a bar of two or three icon buttons, drawn exactly
 /// like the list's rows with the same color, corners, and gap.
 ///
-/// The buttons are bordered `Button`s, rather than navigation links as a link
-/// inside a list ignores its button style and draws as bare text. Each is its
-/// own tap target with the system's press animation, while what a tap does is
-/// up to `perform`.
+/// The buttons are bordered `Button`s: a navigation link inside a list ignores
+/// its button style and draws as bare text. Each is a separate tap target with
+/// the system's press animation; `perform` decides what a tap does.
 struct ActionList<Rows: View>: View {
     let actions: [MenuItem]
 
     /// The buttons' height in points at the default text size, scaled with the
-    /// text size. `nil` makes them exactly a list row's height. A height below
-    /// a row's leaves space around them, since the list keeps its minimum row
-    /// height.
+    /// text size. `nil` makes them a list row's height. A height below a row's
+    /// leaves space around them, as the list keeps its minimum row height.
     var actionHeight: CGFloat?
     let perform: (MenuItem) -> Void
     @ViewBuilder var rows: Rows
@@ -38,9 +36,8 @@ struct ActionList<Rows: View>: View {
                     Button {
                         perform(item)
                     } label: {
-                        // The icon is an overlay so that it does not set the button's height, which
-                        // would outgrow a list row's: the button fills the row instead, and the
-                        // icon is drawn centered on it.
+                        // An overlay, so the icon doesn't set the button's height, which would
+                        // outgrow a row's: the button fills the row and the icon is centered on it.
                         Color.clear
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .overlay {
@@ -48,12 +45,15 @@ struct ActionList<Rows: View>: View {
                                     .font(.title3)
                                     .imageScale(.large)
                                     .foregroundStyle(accent)
+                                    // The button dims its fill, but not an icon with a set color.
+                                    .opacity(item.isDisabled ? 0.4 : 1)
                                     .offset(y: item.opticalOffset * point)
                             }
                     }
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.roundedRectangle)
                     .tint(Self.rowGray)
+                    .disabled(item.isDisabled)
                     // Icon only, so VoiceOver needs the title.
                     .accessibilityLabel(Text(item.title))
                 }

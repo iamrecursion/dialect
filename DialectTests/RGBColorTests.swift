@@ -24,16 +24,15 @@ struct RGBColorTests {
         #expect(RGBColor(sRGBRed: 0x0A, green: 0x84, blue: 0xFF).hex == "#0A84FF")
     }
 
-    /// The green as first chosen, `display-p3(0.57, 0.78, 0.50)`, exactly. It
-    /// is inside sRGB, where it is `#81C977`.
+    /// Dialect's green, `display-p3(0.57, 0.78, 0.50)`, exactly. It is inside
+    /// sRGB, where it is `#81C977`.
     @Test func defaultIsDialectGreen() {
         #expect(RGBColor.dialectGreen == RGBColor(red: 0.57, green: 0.78, blue: 0.5))
         #expect(RGBColor.dialectGreen.hex == "#81C977")
         #expect(RGBColor.dialectGreen.isWithinSRGB)
     }
 
-    /// Hex is sRGB, as everywhere else people find it, so a hex color is
-    /// converted into Display P3.
+    /// Hex is sRGB, as elsewhere, so a hex color is converted into Display P3.
     @Test func convertsSRGBIntoDisplayP3() {
         #expect(
             RGBColor(sRGBRed: 0x63, green: 0xE6, blue: 0xE2)
@@ -187,7 +186,7 @@ struct RGBColorTests {
         let white = RGBColor(red: 1, green: 1, blue: 1)
         #expect(abs(black.contrast(with: white) - 21) < 1e-6)
         #expect(white.contrast(with: white) == 1)
-        // WCAG's own example pair: #767676 on white is 4.54:1.
+        // WCAG's example pair: #767676 on white is 4.54:1.
         let gray = RGBColor(sRGBRed: 0x76, green: 0x76, blue: 0x76)
         #expect(abs(gray.contrast(with: white) - 4.54) < 0.01)
     }

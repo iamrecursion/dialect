@@ -40,14 +40,13 @@ struct REPLView: View {
         .onDisappear { session.close() }
     }
 
-    /// Shaped like the Messages input field, in the list rows' gray, with a
-    /// REPL's prompt as its placeholder. watchOS draws a text field's own gray
-    /// box whatever its style, so the field is drawn here, over the real one:
-    /// taps pass through the drawing to the field, which opens the system's
-    /// text input with the draft in it. (The real field must take the tap
-    /// itself: outside a list nothing passes a tap on to it, and a
-    /// near-transparent field does not get one.) Black behind the capsule hides
-    /// the system box's corners, which are squarer than the capsule's ends.
+    /// Shaped like the Messages input field, in the list rows' gray, with the
+    /// REPL's prompt as its placeholder. watchOS draws a gray box around any
+    /// text field, so this shape is drawn over the real field and passes taps
+    /// through to it, which opens the text input with the draft. (The real
+    /// field must take the tap: outside a list nothing passes a tap on to it,
+    /// and a near-transparent field gets none.) Black behind the capsule hides
+    /// the box's corners, which are squarer than the capsule's ends.
     private var inputField: some View {
         ZStack {
             TextField("Scheme", text: $session.draft, prompt: Text(verbatim: Self.prompt))
