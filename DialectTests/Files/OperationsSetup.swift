@@ -16,6 +16,7 @@ struct OperationsSetup {
     }
 
     var bin: Bin { Bin(url: FilesStores.bin(in: stores.url)) }
+    var clipboard: Clipboard { Clipboard(url: FilesStores.clipboard(in: stores.url)) }
 
     func names(_ path: String = "") throws -> [String] {
         return try FileManager.default.contentsOfDirectory(

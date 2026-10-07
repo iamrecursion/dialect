@@ -41,13 +41,23 @@ struct ActionList<Rows: View>: View {
                         Color.clear
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .overlay {
-                                Image(systemName: item.systemImage)
-                                    .font(.title3)
-                                    .imageScale(.large)
-                                    .foregroundStyle(accent)
-                                    // The button dims its fill, but not an icon with a set color.
-                                    .opacity(item.isDisabled ? 0.4 : 1)
-                                    .offset(y: item.opticalOffset * point)
+                                HStack(spacing: 3 * point) {
+                                    Image(systemName: item.systemImage)
+                                        .imageScale(.large)
+                                        .offset(y: item.opticalOffset * point)
+                                    if let count = item.count {
+                                        Text(count, format: .number)
+                                            .font(.body.weight(.semibold))
+                                            .monospacedDigit()
+                                            .fixedSize()
+                                    }
+                                }
+                                .font(.title3)
+                                .foregroundStyle(accent)
+                                // The button dims its fill, but not an icon with a set color.
+                                .opacity(item.isDisabled ? 0.4 : 1)
+                                // The button's label and value say it all.
+                                .accessibilityHidden(true)
                             }
                     }
                     .buttonStyle(.bordered)
@@ -56,6 +66,7 @@ struct ActionList<Rows: View>: View {
                     .disabled(item.isDisabled)
                     // Icon only, so VoiceOver needs the title.
                     .accessibilityLabel(Text(item.title))
+                    .accessibilityValue(Text(verbatim: item.countDescription ?? ""))
                 }
             }
             .frame(height: actionHeight.map { $0 * point })

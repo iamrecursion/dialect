@@ -19,6 +19,32 @@ enum NameNumbering {
         }
     }
 
+    /// The name of a copy beside its original: `notes copy.md`, then the lowest
+    /// free `notes copy 2.md`, …. A copy of a copy carries on its numbering.
+    static func copyName(for name: String, isDirectory: Bool, taken: [String]) -> String {
+        let word =
+            " "
+            + String(localized: "copy", comment: "Added to a pasted copy's name: “notes copy.md”.")
+        let (base, ext) = parts(of: name, isDirectory: isDirectory)
+        let stem = withoutCopy(unnumbered(base), word) ?? withoutCopy(base, word) ?? base
+        var candidate = fitted(stem, adding: word, ext)
+        var number = 2
+        while taken.contains(where: { NameRules.sameName($0, candidate) }) {
+            candidate = fitted(stem, adding: "\(word) \(number)", ext)
+            number += 1
+        }
+        return candidate
+    }
+
+    /// `base` without a trailing `word`, compared case-insensitively; `nil`
+    /// when it doesn't end in it, or is nothing else.
+    private static func withoutCopy(_ base: String, _ word: String) -> String? {
+        guard let range = base.range(of: word, options: [.caseInsensitive, .anchored, .backwards]),
+            range.lowerBound != base.startIndex
+        else { return nil }
+        return String(base[..<range.lowerBound])
+    }
+
     /// The name with the local date of its deletion before its extension, as
     /// `notes-2026-10-05.md`.
     static func dated(

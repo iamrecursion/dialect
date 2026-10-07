@@ -78,12 +78,11 @@ enum Route: Hashable {
         case .runtimeSettings: return "Runtime"
         case .downloaderSettings: return "Downloader"
         case .companionSettings: return "Companion"
-        case .clipboard: return "Clipboard"
         case .newREPL, .settings, .appearanceSettings, .fileSettings, .textExtensions,
             .accentColor, .credits, .creditsPage:
             return nil
         case .files, .folder, .session, .itemMore, .folderMore, .sort, .group, .folderInfo,
-            .extendedInfo, .add, .newItem, .rename, .bin, .binMore, .binItem:
+            .extendedInfo, .add, .clipboard, .newItem, .rename, .bin, .binMore, .binItem:
             return nil
         }
     }
@@ -108,6 +107,7 @@ enum Route: Hashable {
         case .folderInfo(let path): FolderInfoScreen(path: path)
         case .extendedInfo(let path): ExtendedInfoScreen(path: path)
         case .add(let folder): AddScreen(folder: folder)
+        case .clipboard(let folder): ClipboardScreen(folder: folder)
         case .newItem(let kind, let folder): NameScreen(purpose: .create(kind, in: folder))
         case .rename(let path): NameScreen(purpose: .rename(path))
         case .bin: BinScreen()
@@ -134,6 +134,16 @@ struct MenuItem: Identifiable {
     /// Grayed out: shown, but does nothing yet.
     var isDisabled = false
 
+    /// A number shown after the icon, such as how many items the clipboard
+    /// holds; `nil` shows none.
+    var count: Int?
+
+    /// The count, as VoiceOver reads it.
+    var countDescription: String? {
+        guard let count else { return nil }
+        return count == 1 ? String(localized: "1 item") : String(localized: "\(count) items")
+    }
+
     var id: Route { route }
 }
 
@@ -159,9 +169,9 @@ struct MenuItem: Identifiable {
         /// as in `files/folder:scripts/lib`, with a route for each level;
         /// `more:` takes the rest as an item, and ends on its More screen, as
         /// in `more:notes/todo.txt`. `add` is Add for the folder the path has
-        /// reached, and `new-session`, `new-folder` and `new-file` its name
-        /// screens, so they come before any `folder:`. The path stops at the
-        /// first segment that doesn't name anything.
+        /// reached, `clipboard` its Clipboard, and `new-session`, `new-folder`
+        /// and `new-file` its name screens, so they come before any `folder:`.
+        /// The path stops at the first segment that doesn't name anything.
         static func debugPath(_ spec: String, creditsPages: [NoticeSection]?) -> [Route] {
             var path: [Route] = []
 
@@ -187,6 +197,10 @@ struct MenuItem: Identifiable {
                 }
                 if segment == "add" && pages == nil {
                     path.append(.add(path.last?.filePath ?? .root))
+                    continue
+                }
+                if segment == "clipboard" && pages == nil {
+                    path.append(.clipboard(path.last?.filePath ?? .root))
                     continue
                 }
                 if segment.hasPrefix("new-"), pages == nil,

@@ -259,5 +259,11 @@ struct FileOperationsTests {
             FileOperationError.name(.taken("notes.md")).localizedDescription
                 == NameProblem.taken("notes.md").reason)
         #expect(FileOperationError.gone("scripts").localizedDescription.contains("scripts"))
+        #expect(
+            FileOperationError.intoItself("scripts").localizedDescription
+                == "scripts can't be moved into itself.")
+        #expect(
+            FileOperationError.intoOwnFolder("scripts").localizedDescription
+                == "scripts can't be moved into a folder inside it.")
     }
 }

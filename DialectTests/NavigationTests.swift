@@ -64,7 +64,6 @@ struct NavigationTests {
             (.resumeSession, "Resume Session"), (.sessions, "History"),
             (.editorSettings, "Editor"), (.sessionSettings, "Sessions"),
             (.runtimeSettings, "Runtime"),
-            (.clipboard(.root), "Clipboard"),
             (.companionSettings, "Companion"), (.downloader, "Downloader"),
             (.downloaderSettings, "Downloader"),
         ]
@@ -81,6 +80,7 @@ struct NavigationTests {
         #expect(Route.itemMore(.root).placeholderTitle == nil)
         #expect(Route.add(.root).placeholderTitle == nil)
         #expect(Route.bin.placeholderTitle == nil)
+        #expect(Route.clipboard(.root).placeholderTitle == nil)
     }
 
     @Test func appearanceRows() {
@@ -90,16 +90,24 @@ struct NavigationTests {
         #expect(UIImage(systemName: "swatchpalette") != nil)
     }
 
-    /// The folder screen's buttons. Clipboard is disabled until it has a
-    /// screen.
+    /// The folder screen's buttons. Clipboard fills, with a count, while the
+    /// clipboard holds items.
     @Test func folderButtons() {
         let notes = FilePath(components: ["notes"])
-        let buttons = FolderScreen.buttons(for: notes)
+        let buttons = FolderScreen.buttons(for: notes, clipboardCount: 0)
         #expect(buttons.map(\.title.key) == ["Add", "Clipboard", "More"])
         #expect(
             buttons.map(\.systemImage) == ["plus.capsule", "list.clipboard", "ellipsis.circle"])
         #expect(buttons.map(\.route) == [.add(notes), .clipboard(notes), .folderMore(notes)])
-        #expect(buttons.map(\.isDisabled) == [false, true, false])
+        #expect(buttons.map(\.isDisabled) == [false, false, false])
+        #expect(buttons.map(\.count) == [nil, nil, nil])
+
+        let holding = FolderScreen.buttons(for: notes, clipboardCount: 3)
+        #expect(holding[1].systemImage == "list.clipboard.fill")
+        #expect(holding.map(\.count) == [nil, 3, nil])
+        #expect(holding[1].countDescription == "3 items")
+        #expect(FolderScreen.buttons(for: notes, clipboardCount: 1)[1].countDescription == "1 item")
+        #expect(UIImage(systemName: "list.clipboard.fill") != nil)
         // The clipboard's clip sticks up above its board, which then sits about 1.5 pt low beside
         // its neighbors (measured on the 42 mm and Ultra screenshots).
         #expect(buttons.map(\.opticalOffset) == [0, -1.5, 0])

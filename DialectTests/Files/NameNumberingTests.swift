@@ -4,7 +4,7 @@ import Testing
 @testable import Dialect
 
 /// Free names for an item whose name is taken: " 2", " 3" as the Finder numbers
-/// them, and a restore's deletion date.
+/// them, a restore's deletion date, and a pasted copy's " copy".
 struct NameNumberingTests {
     private func next(_ name: String, directory: Bool = false, taken: [String]) -> String {
         return NameNumbering.nextFree(for: name, isDirectory: directory, taken: taken)
@@ -104,5 +104,58 @@ struct NameNumberingTests {
     @Test func numbersADatedNameThatsTaken() {
         let name = dated("notes.md")
         #expect(next(name, taken: [name]) == "notes-2026-10-05 2.md")
+    }
+
+    // MARK: Copy names
+
+    private func copy(_ name: String, directory: Bool = false, taken: [String]) -> String {
+        return NameNumbering.copyName(for: name, isDirectory: directory, taken: taken)
+    }
+
+    @Test func namesACopyBeforeTheExtension() {
+        #expect(copy("notes.md", taken: ["notes.md"]) == "notes copy.md")
+        #expect(copy("readme", taken: ["readme"]) == "readme copy")
+        #expect(copy(".config", taken: [".config"]) == ".config copy")
+        #expect(copy(".config.toml", taken: [".config.toml"]) == ".config copy.toml")
+    }
+
+    @Test func namesFolderAndSessionCopies() {
+        #expect(copy("v1.old", directory: true, taken: ["v1.old"]) == "v1.old copy")
+        #expect(copy("demo.dial", directory: true, taken: ["demo.dial"]) == "demo copy.dial")
+    }
+
+    @Test func numbersCopiesFromTheLowestFree() {
+        #expect(copy("notes.md", taken: ["notes.md", "notes copy.md"]) == "notes copy 2.md")
+        #expect(
+            copy("notes.md", taken: ["notes.md", "notes copy.md", "notes copy 3.md"])
+                == "notes copy 2.md")
+    }
+
+    /// A copy of a copy carries on its numbering, as the Finder's does.
+    @Test func copiesACopyWithoutDoublingIt() {
+        #expect(copy("notes copy.md", taken: ["notes.md", "notes copy.md"]) == "notes copy 2.md")
+        #expect(
+            copy("notes copy 2.md", taken: ["notes copy.md", "notes copy 2.md"])
+                == "notes copy 3.md")
+    }
+
+    /// Only a number after " copy" is the copy's: elsewhere it's part of the
+    /// name.
+    @Test func keepsANumberThatIsPartOfTheName() {
+        #expect(copy("draft 2.scm", taken: ["draft 2.scm"]) == "draft 2 copy.scm")
+        #expect(copy("copy 2.txt", taken: ["copy 2.txt"]) == "copy 2 copy.txt")
+    }
+
+    @Test func comparesCopiesAsTheFilesystemDoes() {
+        #expect(copy("notes.md", taken: ["notes.md", "Notes Copy.md"]) == "notes copy 2.md")
+        #expect(
+            copy("Caf\u{E9}", taken: ["Caf\u{E9}", "Cafe\u{301} copy"]) == "Caf\u{E9} copy 2")
+    }
+
+    @Test func shortensACopysNameToFit() {
+        let long = String(repeating: "é", count: 125) + ".md"
+        let named = copy(long, taken: [long])
+        #expect(named.utf8.count <= 255)
+        #expect(named.hasSuffix(" copy.md"))
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// An operation that didn't happen: what was being done, and why it failed.
+/// An operation that didn't happen.
 struct OperationFailure {
     let title: LocalizedStringResource
     let reason: String
@@ -16,14 +16,17 @@ struct OperationFailure {
 }
 
 extension View {
-    /// Shows `failure`'s alert while it's set, clearing it when dismissed.
-    func operationFailureAlert(_ failure: Binding<OperationFailure?>) -> some View {
+    /// Shows `failure`'s alert while it's set, clearing it when dismissed, and
+    /// then calling `dismissed`.
+    func operationFailureAlert(
+        _ failure: Binding<OperationFailure?>, dismissed: @escaping () -> Void = {}
+    ) -> some View {
         return alert(
             Text(failure.wrappedValue?.title ?? ""),
             isPresented: Binding(
                 get: { failure.wrappedValue != nil },
                 set: { if !$0 { failure.wrappedValue = nil } }),
-            actions: { Button("OK") {} },
+            actions: { Button("OK", action: dismissed) },
             message: { Text(verbatim: failure.wrappedValue?.reason ?? "") })
     }
 }

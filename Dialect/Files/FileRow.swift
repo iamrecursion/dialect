@@ -27,8 +27,8 @@ struct FileRowStyle {
 
 /// One item in a folder: its icon, its name, and its details when shown. A tap
 /// opens it; a long press, or VoiceOver's More action, opens its More screen.
-/// Swiping left offers Delete and More, each taking a tap, as watchOS lists
-/// have no full swipe.
+/// Swiping left offers Delete and More, and swiping right Copy, each taking a
+/// tap, as watchOS lists have no full swipe.
 ///
 /// `open` must ignore the tap that ends a long press; the folder does, as More
 /// is on top by then.
@@ -39,9 +39,11 @@ struct FileRow: View {
     let open: () -> Void
     let more: () -> Void
     let delete: () -> Void
+    let copy: () -> Void
 
     /// As `MenuRowLabel`'s, so names line up with the menus'.
     @ScaledMetric(relativeTo: .title3) private var iconWidth: CGFloat = 30
+    @Environment(\.dialectAccent) private var accent
 
     private var name: String { item.displayName(showExtensions: style.showExtensions) }
 
@@ -77,10 +79,17 @@ struct FileRow: View {
             }
             .tint(.gray)
         }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button(action: copy) {
+                Label("Copy", systemImage: ClipboardSymbol.copy)
+            }
+            .tint(accent)
+        }
         .accessibilityLabel(Text(verbatim: name))
         .accessibilityValue(Text(verbatim: accessibilityValue))
         .accessibilityAction(named: Text("Delete"), delete)
         .accessibilityAction(named: Text("More"), more)
+        .accessibilityAction(named: Text("Copy"), copy)
     }
 
     /// The kind, then the details when they're shown.

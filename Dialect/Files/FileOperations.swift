@@ -8,10 +8,17 @@ enum FileOperationError: LocalizedError, Equatable, Sendable {
     /// The item, or the folder it was going into, has disappeared.
     case gone(String)
 
+    /// Move was asked to put a folder into itself, or into a folder inside it.
+    case intoItself(String)
+    case intoOwnFolder(String)
+
     var errorDescription: String? {
         switch self {
         case .name(let problem): return problem.reason
         case .gone(let name): return String(localized: "\(name) is no longer there.")
+        case .intoItself(let name): return String(localized: "\(name) can't be moved into itself.")
+        case .intoOwnFolder(let name):
+            return String(localized: "\(name) can't be moved into a folder inside it.")
         }
     }
 }
@@ -32,7 +39,7 @@ struct PartialFailure<Done: Sendable>: LocalizedError {
 actor FileOperations {
     let root: URL
     let stores: URL
-    private let sizes: FolderSizes
+    let sizes: FolderSizes
 
     init(root: URL, stores: URL, sizes: FolderSizes = .shared) {
         self.root = root
@@ -75,6 +82,7 @@ actor FileOperations {
         make: (URL) throws -> Void
     ) async throws -> FilePath {
         try check(name, kind: kind, in: folder)
+        pruneClipboard()
         let staging = FilesStores.staging(in: stores)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         let staged = staging.appending(path: UUID().uuidString, directoryHint: .notDirectory)
@@ -105,8 +113,10 @@ actor FileOperations {
         // to rename.
         if name == old { return path }
         try check(name, kind: kind, in: folder, current: old)
+        pruneClipboard()
         let renamed = folder.appending(name)
         try place(url, to: renamed.url(in: root), named: name, goneName: old)
+        updateClipboard { $0.following(path, to: renamed) }
         await sizes.forget(containing: url)
         await sizes.forget(containing: renamed.url(in: root))
         return renamed
@@ -125,10 +135,13 @@ actor FileOperations {
             do {
                 deleted.append(try moveIntoBin(path, now: now))
             } catch {
-                await forget(paths.prefix(deleted.count).map { $0.url(in: root) })
+                let done = paths.prefix(deleted.count)
+                updateClipboard { held in done.reduce(held) { $0.dropping(within: $1) } }
+                await forget(done.map { $0.url(in: root) })
                 throw PartialFailure.of(error, after: deleted)
             }
         }
+        updateClipboard { held in paths.reduce(held) { $0.dropping(within: $1) } }
         await forget(paths.map { $0.url(in: root) })
         return deleted
     }
@@ -136,7 +149,7 @@ actor FileOperations {
     /// The record first, then the item, so the item is never in the bin without
     /// it. The newest always takes the name: a namesake already in the bin is
     /// renamed to the next free number.
-    private func moveIntoBin(_ path: FilePath, now: Date) throws -> BinItem {
+    func moveIntoBin(_ path: FilePath, now: Date) throws -> BinItem {
         guard let name = path.name else { preconditionFailure("Files' root can't be deleted") }
         let url = path.url(in: root)
         guard Self.kind(at: url) != nil else { throw FileOperationError.gone(name) }
@@ -175,6 +188,7 @@ actor FileOperations {
     /// file now stands. Returns where it went.
     func restore(_ item: BinItem, timeZone: TimeZone = .current) async throws -> Restored {
         bin.tidy()
+        pruneClipboard()
         let restored = try moveOutOfBin(item, timeZone: timeZone)
         await forget([restored.path.url(in: root)])
         return restored
@@ -188,6 +202,7 @@ actor FileOperations {
         var restored: [Restored] = []
         let bin = self.bin
         bin.tidy()
+        pruneClipboard()
         for item in bin.items() {
             do {
                 restored.append(try moveOutOfBin(item, timeZone: timeZone))
@@ -201,7 +216,7 @@ actor FileOperations {
     }
 
     /// The item as it is in the bin now.
-    private func moveOutOfBin(_ listed: BinItem, timeZone: TimeZone) throws -> Restored {
+    func moveOutOfBin(_ listed: BinItem, timeZone: TimeZone) throws -> Restored {
         guard let item = bin.item(listed.id) else { throw FileOperationError.gone(listed.name) }
         let folder = try recreate(
             item.original.parent ?? .root, deleted: item.deleted, timeZone: timeZone)
@@ -303,7 +318,7 @@ actor FileOperations {
     // MARK: Folder sizes
 
     /// Drops the cached totals above and inside each changed item.
-    private func forget(_ urls: [URL]) async {
+    func forget(_ urls: [URL]) async {
         for url in urls { await sizes.forget(containing: url) }
     }
 
@@ -322,7 +337,7 @@ actor FileOperations {
     }
 
     /// Every name in `folder`, hidden ones included.
-    private func contents(of folder: FilePath) throws -> [String] {
+    func contents(of folder: FilePath) throws -> [String] {
         do {
             return try FileManager.default.contentsOfDirectory(
                 atPath: folder.url(in: root).path(percentEncoded: false))
@@ -333,7 +348,7 @@ actor FileOperations {
 
     /// Renames `url` to `destination`, reporting a name taken since the check
     /// as taken.
-    private func place(_ url: URL, to destination: URL, named name: String, goneName: String)
+    func place(_ url: URL, to destination: URL, named name: String, goneName: String)
         throws
     {
         do {
@@ -347,7 +362,7 @@ actor FileOperations {
 
     /// The item's shape as listed, a link as what it leads to; `nil` if it's
     /// gone. A broken link is a file.
-    private static func kind(at url: URL) -> NewItemKind? {
+    static func kind(at url: URL) -> NewItemKind? {
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
         guard var values = try? url.resourceValues(forKeys: keys) else { return nil }
         if values.isSymbolicLink == true {
@@ -360,7 +375,7 @@ actor FileOperations {
             ? .session : .folder
     }
 
-    private static func displayName(of folder: FilePath) -> String {
+    static func displayName(of folder: FilePath) -> String {
         return folder.name ?? String(localized: "Files")
     }
 }

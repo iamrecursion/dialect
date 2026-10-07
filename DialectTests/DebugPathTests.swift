@@ -46,9 +46,11 @@ struct DebugPathTests {
             ])
     }
 
-    @Test func opensTheBinAndAdd() {
+    @Test func opensTheBinAddAndClipboard() {
         #expect(Route.debugPath("files/trash", creditsPages: pages) == [.files, .bin])
         #expect(Route.debugPath("files/add", creditsPages: pages) == [.files, .add(.root)])
+        #expect(
+            Route.debugPath("files/clipboard", creditsPages: pages) == [.files, .clipboard(.root)])
         #expect(
             Route.debugPath("files/new-session", creditsPages: pages) == [
                 .files, .newItem(.session, in: .root),

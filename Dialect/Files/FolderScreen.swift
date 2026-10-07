@@ -42,14 +42,17 @@ enum FolderLoader {
 struct FolderScreen: View {
     let path: FilePath
 
-    /// Clipboard is disabled until it has a screen.
-    static func buttons(for path: FilePath) -> [MenuItem] {
+    /// Clipboard fills, with a count, while the clipboard holds items.
+    static func buttons(for path: FilePath, clipboardCount: Int) -> [MenuItem] {
+        let holding = clipboardCount > 0
         return [
             MenuItem(title: "Add", systemImage: "plus.capsule", route: .add(path)),
             // The clip sticks up above the board, which then sits low beside the other icons.
             MenuItem(
-                title: "Clipboard", systemImage: "list.clipboard", route: .clipboard(path),
-                opticalOffset: -1.5, isDisabled: true),
+                title: "Clipboard",
+                systemImage: holding ? "list.clipboard.fill" : "list.clipboard",
+                route: .clipboard(path), opticalOffset: -1.5,
+                count: holding ? clipboardCount : nil),
             MenuItem(title: "More", systemImage: "ellipsis.circle", route: .folderMore(path)),
         ]
     }
@@ -82,9 +85,14 @@ struct FolderScreen: View {
     /// Counts reads begun, so one that finishes after a newer has begun is
     /// dropped: a delete's re-read may overtake another's.
     @State private var reads = 0
+    /// How many items the clipboard holds that are still there.
+    @State private var clipboardCount = 0
 
     var body: some View {
-        ActionList(actions: Self.buttons(for: path), perform: { navigation.push($0.route) }) {
+        ActionList(
+            actions: Self.buttons(for: path, clipboardCount: clipboardCount),
+            perform: { navigation.push($0.route) }
+        ) {
             rows
         }
         .navigationTitle(title)
@@ -142,7 +150,7 @@ struct FolderScreen: View {
                             item: item, size: item.isDirectory ? sizes[item.path] : item.size,
                             style: style, open: { open(item) },
                             more: { navigation.push(.itemMore(item.path)) },
-                            delete: { delete(item) })
+                            delete: { delete(item) }, copy: { copy(item) })
                     }
                 } header: {
                     if let group = section.group {
@@ -178,9 +186,7 @@ struct FolderScreen: View {
         }
     }
 
-    /// Deleting never asks: the row leaves at once, and the folder is read
-    /// again once the item is in the bin. A failure brings the row back with
-    /// that read.
+    /// Deleting never asks. A failure brings the row back with that read.
     private func delete(_ item: FileItem) {
         deleting.insert(item.path)
         Task {
@@ -194,6 +200,19 @@ struct FolderScreen: View {
         }
     }
 
+    /// Puts the item on the clipboard, then reads the folder again for the
+    /// Clipboard button's count.
+    private func copy(_ item: FileItem) {
+        Task {
+            do {
+                try await FileOperations.copyWithTap([item.path])
+            } catch {
+                failure = OperationFailure("Couldn't Copy", error)
+            }
+            await load()
+        }
+    }
+
     /// Reads the folder off the main actor, then works out the sizes of the
     /// folders and sessions in it, which fill in as they arrive.
     private func load() async {
@@ -202,14 +221,19 @@ struct FolderScreen: View {
         let root = FilesRoot.url
         let (path, showHidden) = (self.path, self.showHidden)
         let textExtensions = FileSettings.textExtensions()
-        let loaded = await Task.detached(priority: .userInitiated) {
-            FolderLoader.load(
-                path, root: root, showHidden: showHidden, textExtensions: textExtensions)
+        let clipboard = FilesRoot.operations.clipboard
+        let (loaded, held) = await Task.detached(priority: .userInitiated) {
+            (
+                FolderLoader.load(
+                    path, root: root, showHidden: showHidden, textExtensions: textExtensions),
+                clipboard.existing(root: root).count
+            )
         }.value
 
         // A newer read has started, such as for Show Hidden or a delete: this one is out of date.
         guard !Task.isCancelled, read == reads else { return }
         contents = loaded
+        clipboardCount = held
         guard case .items(let items, _) = loaded else { return }
 
         // Handed over in batches, as each change re-sorts the folder.

@@ -15,4 +15,9 @@ enum FilesStores {
     static func bin(in stores: URL) -> URL {
         return stores.appending(path: "Bin", directoryHint: .isDirectory)
     }
+
+    /// What the clipboard holds.
+    static func clipboard(in stores: URL) -> URL {
+        return stores.appending(path: "Clipboard.json", directoryHint: .notDirectory)
+    }
 }
