@@ -47,6 +47,8 @@ struct FolderMoreScreen: View {
 
     var body: some View {
         List {
+            UndoRows(here: path)
+                .disabled(deleting)
             Section {
                 ForEach([Action.sort, .group, .showHidden, .folderInfo], id: \.self, content: row)
             }

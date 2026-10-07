@@ -41,10 +41,17 @@ actor FileOperations {
     let stores: URL
     let sizes: FolderSizes
 
-    init(root: URL, stores: URL, sizes: FolderSizes = .shared) {
+    /// How many steps the undo history keeps.
+    let historyLength: @Sendable () -> Int
+
+    init(
+        root: URL, stores: URL, sizes: FolderSizes = .shared,
+        historyLength: @escaping @Sendable () -> Int = { FileSettings.undoHistory() }
+    ) {
         self.root = root
         self.stores = stores
         self.sizes = sizes
+        self.historyLength = historyLength
     }
 
     /// Removes what an interrupted operation left in staging.
@@ -95,6 +102,8 @@ actor FileOperations {
             try? FileManager.default.removeItem(at: staged)
             throw error
         }
+        // Before any await, so the history keeps the order things happened in.
+        record(Step(kind: kind.newStep, changes: [Step.Change(from: nil, to: .files(made))]))
         await sizes.forget(containing: made.url(in: root))
         return made
     }
@@ -117,6 +126,8 @@ actor FileOperations {
         let renamed = folder.appending(name)
         try place(url, to: renamed.url(in: root), named: name, goneName: old)
         updateClipboard { $0.following(path, to: renamed) }
+        record(
+            Step(kind: .rename, changes: [Step.Change(from: .files(path), to: .files(renamed))]))
         await sizes.forget(containing: url)
         await sizes.forget(containing: renamed.url(in: root))
         return renamed
@@ -137,40 +148,61 @@ actor FileOperations {
             } catch {
                 let done = paths.prefix(deleted.count)
                 updateClipboard { held in done.reduce(held) { $0.dropping(within: $1) } }
+                record(Self.deleteStep(done, deleted))
                 await forget(done.map { $0.url(in: root) })
                 throw PartialFailure.of(error, after: deleted)
             }
         }
         updateClipboard { held in paths.reduce(held) { $0.dropping(within: $1) } }
+        record(Self.deleteStep(paths, deleted))
         await forget(paths.map { $0.url(in: root) })
         return deleted
     }
 
+    private static func deleteStep(_ paths: some Sequence<FilePath>, _ deleted: [BinItem]) -> Step {
+        return Step(
+            kind: .delete,
+            changes: zip(paths, deleted).map { Step.Change(from: .files($0), to: $1.place) })
+    }
+
+    func moveIntoBin(_ path: FilePath, now: Date, id: UUID = UUID()) throws -> BinItem {
+        guard let name = path.name else { preconditionFailure("Files' root can't be deleted") }
+        return try moveIntoBin(
+            path, as: Bin.Record(name: name, original: path.components, deleted: now), id: id)
+    }
+
     /// The record first, then the item, so the item is never in the bin without
-    /// it. The newest always takes the name: a namesake already in the bin is
-    /// renamed to the next free number.
-    func moveIntoBin(_ path: FilePath, now: Date) throws -> BinItem {
+    /// it. If there is a clash, the older deletion is renamed to the next free
+    /// number, so a new deletion always takes the clashing name.
+    func moveIntoBin(_ path: FilePath, as record: Bin.Record, id: UUID = UUID()) throws
+        -> BinItem
+    {
         guard let name = path.name else { preconditionFailure("Files' root can't be deleted") }
         let url = path.url(in: root)
-        guard Self.kind(at: url) != nil else { throw FileOperationError.gone(name) }
+        guard let kind = Self.kind(at: url) else { throw FileOperationError.gone(name) }
         let bin = self.bin
         try FileManager.default.createDirectory(at: bin.url, withIntermediateDirectories: true)
 
-        let items = bin.items()
-        let holder = items.first { NameRules.sameName($0.name, name) }
-        if let holder {
-            let renamed = NameNumbering.nextFree(
-                for: holder.name, isDirectory: holder.isDirectory, taken: items.map(\.name))
-            try bin.write(holder.record(named: renamed), in: holder.directory)
-        }
-
-        let id = UUID()
+        // First, so a failure never removes a directory it didn't make.
         let directory = bin.directory(for: id)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+
+        var record = record
+        let items = bin.items()
+        let taken = items.map(\.name)
+        var holder = items.first { NameRules.sameName($0.name, record.name) }
+        if let newer = holder, newer.deleted > record.deleted {
+            record.name = NameNumbering.nextFree(
+                for: record.name, isDirectory: kind != .file, taken: taken)
+            holder = nil
+        }
         do {
-            try FileManager.default.createDirectory(
-                at: directory, withIntermediateDirectories: false)
-            try bin.write(
-                Bin.Record(name: name, original: path.components, deleted: now), in: directory)
+            if let holder {
+                let renamed = NameNumbering.nextFree(
+                    for: holder.name, isDirectory: holder.isDirectory, taken: taken)
+                try bin.write(holder.record(named: renamed), in: holder.directory)
+            }
+            try bin.write(record, in: directory)
             try place(url, to: Bin.item(in: directory), named: name, goneName: name)
         } catch {
             try? FileManager.default.removeItem(at: directory)
@@ -190,6 +222,7 @@ actor FileOperations {
         bin.tidy()
         pruneClipboard()
         let restored = try moveOutOfBin(item, timeZone: timeZone)
+        record(Self.restoreStep([restored]))
         await forget([restored.path.url(in: root)])
         return restored
     }
@@ -207,35 +240,56 @@ actor FileOperations {
             do {
                 restored.append(try moveOutOfBin(item, timeZone: timeZone))
             } catch {
+                record(Self.restoreStep(restored))
                 await forget(restored.map { $0.path.url(in: root) })
                 throw PartialFailure.of(error, after: restored)
             }
         }
+        record(Self.restoreStep(restored))
         await forget(restored.map { $0.path.url(in: root) })
         return restored
+    }
+
+    private static func restoreStep(_ restored: [Restored]) -> Step {
+        let made = restored.flatMap(\.made)
+        return Step(
+            kind: .restore,
+            changes: restored.map { Step.Change(from: $0.item.place, to: .files($0.path)) },
+            madeFolders: made.isEmpty ? nil : made)
     }
 
     /// The item as it is in the bin now.
     func moveOutOfBin(_ listed: BinItem, timeZone: TimeZone) throws -> Restored {
         guard let item = bin.item(listed.id) else { throw FileOperationError.gone(listed.name) }
-        let folder = try recreate(
+        let (folder, made) = try recreate(
             item.original.parent ?? .root, deleted: item.deleted, timeZone: timeZone)
-        let taken = try contents(of: folder)
-        var name = item.name
-        if taken.contains(where: { NameRules.sameName($0, name) }) {
-            let dated = NameNumbering.dated(
-                name, isDirectory: item.isDirectory, deleted: item.deleted, timeZone: timeZone)
-            name = NameNumbering.nextFree(for: dated, isDirectory: item.isDirectory, taken: taken)
+        let restored: FilePath
+        do {
+            let taken = try contents(of: folder)
+            var name = item.name
+            if taken.contains(where: { NameRules.sameName($0, name) }) {
+                let dated = NameNumbering.dated(
+                    name, isDirectory: item.isDirectory, deleted: item.deleted, timeZone: timeZone)
+                name = NameNumbering.nextFree(
+                    for: dated, isDirectory: item.isDirectory, taken: taken)
+            }
+            restored = folder.appending(name)
+            try place(item.url, to: restored.url(in: root), named: name, goneName: item.name)
+        } catch {
+            _ = removeEmpty(made)
+            throw error
         }
-        let restored = folder.appending(name)
-        try place(item.url, to: restored.url(in: root), named: name, goneName: item.name)
         try? FileManager.default.removeItem(at: item.directory)
-        return Restored(item: item, path: restored)
+        return Restored(item: item, path: restored, made: made)
     }
 
-    /// The folder at `path`, recreated if missing.
-    private func recreate(_ path: FilePath, deleted: Date, timeZone: TimeZone) throws -> FilePath {
+    /// The folder at `path`, recreated if missing, and the folders made,
+    /// outermost first.
+    private func recreate(_ path: FilePath, deleted: Date, timeZone: TimeZone) throws -> (
+        FilePath, made: [FilePath]
+    ) {
         var folder = FilePath.root
+        var made: [FilePath] = []
         for component in path.components {
             let dated = NameNumbering.dated(
                 component, isDirectory: true, deleted: deleted, timeZone: timeZone)
@@ -243,28 +297,30 @@ actor FileOperations {
             var candidate = component
             while true {
                 if let entered = try enter(candidate, in: folder) {
-                    folder = entered
+                    folder = entered.path
+                    if entered.made { made.append(entered.path) }
                     break
                 }
                 blocked.append(candidate)
                 candidate = NameNumbering.nextFree(for: dated, isDirectory: true, taken: blocked)
             }
         }
-        return folder
+        return (folder, made)
     }
 
     /// The folder `name` in `folder`, made if nothing has the name; `nil` when
     /// something that isn't a folder has it.
-    private func enter(_ name: String, in folder: FilePath) throws -> FilePath? {
+    private func enter(_ name: String, in folder: FilePath) throws -> (path: FilePath, made: Bool)?
+    {
         if let existing = try contents(of: folder).first(where: { NameRules.sameName($0, name) }) {
             let path = folder.appending(existing)
             let kind = Self.kind(at: path.url(in: root))
-            return kind == .folder || kind == .session ? path : nil
+            return kind == .folder || kind == .session ? (path, false) : nil
         }
         let path = folder.appending(name)
         try FileManager.default.createDirectory(
             at: path.url(in: root), withIntermediateDirectories: false)
-        return path
+        return (path, true)
     }
 
     /// Removes the items from the bin for good. One already gone is skipped.

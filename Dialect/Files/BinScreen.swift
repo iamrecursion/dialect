@@ -97,6 +97,9 @@ struct BinScreen: View {
         } message: { _ in
             Text("This can't be undone.")
         }
+        .onChange(of: confirming != nil) { _, isAsking in
+            if isAsking { Haptics.confirmPermanentDeletion() }
+        }
         .alert(
             "Restored",
             isPresented: Binding(get: { note != nil }, set: { if !$0 { note = nil } }),
@@ -291,6 +294,9 @@ struct BinItemScreen: View {
         } message: {
             Text("This can't be undone.")
         }
+        .onChange(of: confirming) { _, isAsking in
+            if isAsking { Haptics.confirmPermanentDeletion() }
+        }
         .alert(
             "Restored",
             isPresented: Binding(get: { note != nil }, set: { if !$0 { note = nil } }),
@@ -406,6 +412,9 @@ struct BinMoreScreen: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This can't be undone.")
+        }
+        .onChange(of: confirming) { _, isAsking in
+            if isAsking { Haptics.confirmPermanentDeletion() }
         }
         .alert(
             "Restored",

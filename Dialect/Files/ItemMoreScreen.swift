@@ -51,10 +51,6 @@ struct ItemMoreScreen: View {
                         MenuRowLabel(
                             title: "Rename", systemImage: "rectangle.and.pencil.and.ellipsis")
                     }
-                    Button(action: delete) {
-                        MenuRowLabel(title: "Delete", systemImage: "trash")
-                    }
-                    .disabled(deleting)
                 }
                 .disabled(transfer != nil)
                 if info.item.kind == .session {
@@ -67,6 +63,15 @@ struct ItemMoreScreen: View {
                         }
                     }
                 }
+                UndoRows(here: path.parent ?? .root)
+                    .disabled(transfer != nil || deleting)
+                Section {
+                    Button(action: delete) {
+                        MenuRowLabel(title: "Delete", systemImage: "trash")
+                    }
+                    .disabled(deleting)
+                }
+                .disabled(transfer != nil)
             } else if loaded {
                 MissingItem()
             }

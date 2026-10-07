@@ -40,6 +40,19 @@ struct BinTests {
         #expect(json["deleted"] as? String == "2026-10-05T12:00:00.000Z")
     }
 
+    /// A date read back and written again stays the same, as when the bin
+    /// renames a namesake.
+    @Test func keepsADateWrittenAgain() throws {
+        let stores = try TemporaryRoot()
+        let bin = Bin(url: FilesStores.bin(in: stores.url))
+        let deleted = Self.noon + 0.828
+        let id = try put(bin, "a", from: "a", deleted: deleted)
+        let first = try #require(bin.item(id))
+        try bin.write(first.record(named: "a"), in: first.directory)
+        #expect(bin.item(id)?.deleted == first.deleted)
+        #expect(abs(first.deleted.timeIntervalSince(deleted)) < 0.000_5)
+    }
+
     /// A record written by hand, without fractional seconds, still reads.
     @Test func readsADateWithoutFractionalSeconds() throws {
         let stores = try TemporaryRoot()

@@ -20,4 +20,9 @@ enum FilesStores {
     static func clipboard(in stores: URL) -> URL {
         return stores.appending(path: "Clipboard.json", directoryHint: .notDirectory)
     }
+
+    /// The undo history.
+    static func history(in stores: URL) -> URL {
+        return stores.appending(path: "History.json", directoryHint: .notDirectory)
+    }
 }

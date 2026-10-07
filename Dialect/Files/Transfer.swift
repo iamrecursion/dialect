@@ -178,7 +178,27 @@ extension FileOperations {
         for transfer in done where transfer.placed != nil && kind == .move {
             changed.append(transfer.source.url(in: root))
         }
+        record(Self.step(kind, done))
         await forget(changed)
+    }
+
+    /// The step for what Paste or Move did: an item Replace sent to the bin
+    /// before the one that took its place.
+    private static func step(_ kind: Transfer.Kind, _ done: [Transfer]) -> Step {
+        var changes: [Step.Change] = []
+        for transfer in done {
+            guard let placed = transfer.placed, kind == .paste || placed != transfer.source else {
+                continue
+            }
+            if let replaced = transfer.replaced {
+                changes.append(
+                    Step.Change(from: .files(replaced.original), to: replaced.place, replaced: true)
+                )
+            }
+            let from: Step.Place? = kind == .move ? .files(transfer.source) : nil
+            changes.append(Step.Change(from: from, to: .files(placed)))
+        }
+        return Step(kind: kind == .paste ? .paste : .move, changes: changes)
     }
 
     /// Move refuses outright when any item would go into itself.

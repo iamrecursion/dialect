@@ -129,12 +129,14 @@ struct Bin: Sendable {
     /// Dates to the millisecond, so deletions moments apart keep their order.
     private static let dateStyle = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 
+    /// To the nearest millisecond: the style truncates, so a date read back
+    /// would otherwise lose one each time its record is written.
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .custom { date, encoder in
             var container = encoder.singleValueContainer()
-            try container.encode(date.formatted(dateStyle))
+            try container.encode(date.addingTimeInterval(0.0005).formatted(dateStyle))
         }
         return encoder
     }()
@@ -206,6 +208,9 @@ extension BinItem {
 struct Restored: Hashable, Sendable {
     let item: BinItem
     let path: FilePath
+
+    /// The folders made again on the way, outermost first.
+    var made: [FilePath] = []
 
     /// Whether it went back where it was, under its name in the bin, comparing
     /// names as APFS does.

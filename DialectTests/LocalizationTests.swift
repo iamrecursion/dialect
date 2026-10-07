@@ -29,6 +29,10 @@ struct LocalizationTests {
         #expect(
             bundle.localizedString(forKey: "Empty Trash After", value: nil, table: nil)
                 == "Empty Bin After")
+        #expect(
+            bundle.localizedString(
+                forKey: "This can't be undone, as %@ is no longer in the Trash.", value: nil,
+                table: nil) == "This can't be undone, as %@ is no longer in the Bin.")
     }
 
     private func localization(_ identifier: String) -> Bundle? {

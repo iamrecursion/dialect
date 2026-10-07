@@ -30,6 +30,9 @@ extension EnvironmentValues {
 /// background.
 struct MenuRowLabel: View {
     let title: LocalizedStringResource
+
+    /// A line beneath the title.
+    var detail: String?
     let image: Image
 
     init(item: MenuItem) {
@@ -37,8 +40,9 @@ struct MenuRowLabel: View {
     }
 
     /// For a row that performs an action.
-    init(title: LocalizedStringResource, systemImage: String) {
+    init(title: LocalizedStringResource, detail: String? = nil, systemImage: String) {
         self.init(title: title, symbol: .system(systemImage))
+        self.detail = detail
     }
 
     /// For a row whose icon may be one of Dialect's custom symbols.
@@ -59,7 +63,14 @@ struct MenuRowLabel: View {
                 .font(.title3)
                 .foregroundStyle(accent)
                 .frame(width: iconWidth)
-            Text(title)
+            VStack(alignment: .leading) {
+                Text(title)
+                if let detail {
+                    Text(verbatim: detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Spacer(minLength: 0)
         }
     }

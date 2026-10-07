@@ -1,6 +1,74 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ has changed since. Move it to the Trash anyway?" : {
+      "localizations" : {
+        "en-AU" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ has changed since. Move it to the Bin anyway?"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ has changed since. Move it to the Bin anyway?"
+          }
+        },
+        "en-IE" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ has changed since. Move it to the Bin anyway?"
+          }
+        },
+        "en-IN" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ has changed since. Move it to the Bin anyway?"
+          }
+        },
+        "en-NZ" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ has changed since. Move it to the Bin anyway?"
+          }
+        }
+      }
+    },
+    "%lld items have changed since. Move them to the Trash anyway?" : {
+      "localizations" : {
+        "en-AU" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld items have changed since. Move them to the Bin anyway?"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld items have changed since. Move them to the Bin anyway?"
+          }
+        },
+        "en-IE" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld items have changed since. Move them to the Bin anyway?"
+          }
+        },
+        "en-IN" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld items have changed since. Move them to the Bin anyway?"
+          }
+        },
+        "en-NZ" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld items have changed since. Move them to the Bin anyway?"
+          }
+        }
+      }
+    },
     "Accent Color" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -187,6 +255,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The Bin is empty"
+          }
+        }
+      }
+    },
+    "This can't be redone, as %@ is no longer in the Trash." : {
+      "localizations" : {
+        "en-AU" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be redone, as %@ is no longer in the Bin."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be redone, as %@ is no longer in the Bin."
+          }
+        },
+        "en-IE" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be redone, as %@ is no longer in the Bin."
+          }
+        },
+        "en-IN" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be redone, as %@ is no longer in the Bin."
+          }
+        },
+        "en-NZ" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be redone, as %@ is no longer in the Bin."
+          }
+        }
+      }
+    },
+    "This can't be undone, as %@ is no longer in the Trash." : {
+      "localizations" : {
+        "en-AU" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be undone, as %@ is no longer in the Bin."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be undone, as %@ is no longer in the Bin."
+          }
+        },
+        "en-IE" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be undone, as %@ is no longer in the Bin."
+          }
+        },
+        "en-IN" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be undone, as %@ is no longer in the Bin."
+          }
+        },
+        "en-NZ" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be undone, as %@ is no longer in the Bin."
           }
         }
       }

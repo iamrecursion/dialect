@@ -32,6 +32,11 @@ enum FileSettings {
     static let emptyTrashAfterDefault = 30
     static let emptyTrashAfterChoices = [0, 1, 3, 7, 14, 30, 90]
 
+    /// Steps the undo history keeps.
+    static let undoHistoryKey = "files.undoHistory"
+    static let undoHistoryDefault = 20
+    static let undoHistoryChoices = [20, 50, 100]
+
     /// The extensions used to make files, most recent first, without dots;
     /// empty for None.
     static let recentExtensionsKey = "files.recentExtensions"
@@ -94,6 +99,18 @@ enum FileSettings {
         case 1: return String(localized: "1 Day")
         default: return String(localized: "\(days) Days")
         }
+    }
+
+    static func undoHistory(in defaults: UserDefaults = .standard) -> Int {
+        let steps = defaults.integer(forKey: undoHistoryKey)
+        return steps > 0 ? steps : undoHistoryDefault
+    }
+
+    static func shorteningNote(dropping steps: Int) -> String {
+        return steps == 1
+            ? String(localized: "The oldest step will be dropped and can't then be undone.")
+            : String(
+                localized: "The oldest \(steps) steps will be dropped and can't then be undone.")
     }
 
     static func recentExtensions(in defaults: UserDefaults = .standard) -> [String] {
