@@ -15,7 +15,7 @@ final class MainMenuUITests: XCTestCase {
     @MainActor
     func testEachTopButtonOpensItsOwnScreen() {
         for (label, title) in [
-            ("New REPL", "REPL"), ("Resume Session", "Resume Session"), ("Sessions", "History"),
+            ("New REPL", "REPL"), ("Resume Session", "Resume Session"), ("Recents", "Recents"),
         ] {
             app.buttons[label].tap()
             XCTAssertTrue(

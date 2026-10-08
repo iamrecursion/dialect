@@ -133,6 +133,21 @@ struct ClipboardTests {
         #expect(setup.clipboard.paths().isEmpty)
     }
 
+    /// Undo moves every item before the clipboard follows, so it follows them
+    /// all at once: one at a time, a path a later change moves would already be
+    /// gone.
+    @Test func followsAnUndoneMoveOfSeveralItems() async throws {
+        let setup = try OperationsSetup()
+        try setup.root.file("a/x.txt")
+        try setup.root.file("a/y.txt")
+        try setup.root.folder("b")
+        try await setup.operations.copy([FilePath("a/x.txt"), FilePath("a/y.txt")])
+        _ = try await setup.operations.move(into: FilePath("b"), choices: [:])
+        try await setup.operations.copy([FilePath("b/x.txt"), FilePath("b/y.txt")])
+        _ = try await setup.operations.undo()
+        #expect(setup.clipboard.paths() == [FilePath("a/x.txt"), FilePath("a/y.txt")])
+    }
+
     /// A link is held as the link, even when it's broken.
     @Test func holdsALink() async throws {
         let setup = try OperationsSetup()

@@ -27,8 +27,8 @@
                 .appending(path: "SeedFiles/Application Support", directoryHint: .isDirectory)
         }
 
-        /// Builds the tree at `root`, and the bin in `stores` when given,
-        /// deleting whatever was in either first.
+        /// Builds the tree at `root`, and the bin and Recents in `stores` when
+        /// given, deleting whatever was in either first.
         static func build(at root: URL, stores: URL? = nil, now: Date = Date()) throws {
             let manager = FileManager.default
             try? manager.removeItem(at: root)
@@ -96,7 +96,13 @@
                     ofItemAtPath: root.appending(path: path).path(percentEncoded: false))
             }
 
-            if let stores { try buildBin(in: stores, now: now) }
+            if let stores {
+                try buildBin(in: stores, now: now)
+                try Recents(url: FilesStores.recents(in: stores)).write(
+                    ["notes/todo.txt", "demo.dial", "scripts/prelude.scm"].map {
+                        FilePath(components: $0.split(separator: "/").map(String.init))
+                    })
+            }
         }
 
         /// The bin, with what its tests need: an item to restore to its folder,

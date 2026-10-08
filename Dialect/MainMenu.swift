@@ -9,10 +9,7 @@ struct MainMenu: View {
             title: "New REPL", systemImage: "square.and.pencil", route: .newREPL,
             opticalOffset: -2.25),
         MenuItem(title: "Resume Session", systemImage: "playpause", route: .resumeSession),
-        MenuItem(
-            title: "Sessions",
-            systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90",
-            route: .sessions),
+        MenuItem(title: "Recents", systemImage: RecentsSymbol.recents, route: .recents),
     ]
 
     static let rows = [

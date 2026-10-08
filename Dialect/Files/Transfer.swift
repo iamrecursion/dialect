@@ -66,7 +66,7 @@ extension FileOperations {
     private func transfer(
         _ kind: Transfer.Kind, into folder: FilePath, choices: [FilePath: ClashChoice]
     ) async throws -> [Transfer] {
-        pruneClipboard()
+        pruneHeld()
         let sources = clipboard.paths()
         if kind == .move { try refuseIntoItself(sources, folder) }
         _ = try contents(of: folder)
@@ -157,9 +157,10 @@ extension FileOperations {
         return replaced
     }
 
-    /// Brings the clipboard up to date and drops the changed folders' totals.
-    /// Paste keeps the clipboard; a Move that finished empties it, and one that
-    /// stopped keeps what it didn't move.
+    /// Brings the clipboard and Recents up to date and drops the changed
+    /// folders' totals. Paste keeps the clipboard; a Move that finished empties
+    /// it, and one that stopped keeps what it didn't move. Recents follows what
+    /// was moved.
     private func finish(
         _ kind: Transfer.Kind, _ done: [Transfer], into folder: FilePath, stopped: Bool
     )
@@ -172,6 +173,18 @@ extension FileOperations {
             let moved = kind == .move ? done.filter { $0.placed != nil }.map(\.source) : []
             updateClipboard { held in
                 (replaced + moved).reduce(held) { $0.dropping(within: $1) }
+            }
+        }
+        updateRecents { held in
+            done.reduce(held) { held, transfer in
+                var held = held
+                if let replaced = transfer.replaced {
+                    held = held.dropping(within: replaced.original)
+                }
+                if kind == .move, let placed = transfer.placed {
+                    held = held.following(transfer.source, to: placed)
+                }
+                return held
             }
         }
         var changed = [folder.url(in: root)]

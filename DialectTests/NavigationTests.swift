@@ -7,13 +7,13 @@ import UIKit
 @MainActor
 struct NavigationTests {
     @Test func topRow() {
-        #expect(MainMenu.topRow.map(\.title.key) == ["New REPL", "Resume Session", "Sessions"])
+        #expect(MainMenu.topRow.map(\.title.key) == ["New REPL", "Resume Session", "Recents"])
         #expect(
             MainMenu.topRow.map(\.systemImage) == [
                 "square.and.pencil", "playpause",
                 "clock.arrow.trianglehead.counterclockwise.rotate.90",
             ])
-        #expect(MainMenu.topRow.map(\.route) == [.newREPL, .resumeSession, .sessions])
+        #expect(MainMenu.topRow.map(\.route) == [.newREPL, .resumeSession, .recents])
     }
 
     /// `square.and.pencil`'s pencil tip sticks up above its square, so at
@@ -25,7 +25,8 @@ struct NavigationTests {
     }
 
     @Test func menuRows() {
-        #expect(MainMenu.rows.map(\.title.key) == ["Files", "Downloader", "Settings"])
+        #expect(
+            MainMenu.rows.map(\.title.key) == ["Files", "Downloader", "Settings"])
         #expect(MainMenu.rows.map(\.systemImage) == ["folder", "arrow.down.circle", "gear"])
         #expect(MainMenu.rows.map(\.route) == [.files, .downloader, .settings])
         #expect(MainMenu.rows.allSatisfy { $0.opticalOffset == 0 })
@@ -34,18 +35,20 @@ struct NavigationTests {
     @Test func settingsRows() {
         #expect(
             SettingsView.rows.map(\.title.key) == [
-                "Editor", "Sessions", "Appearance", "Runtime", "Files", "Downloader", "Companion",
+                "Editor", "Sessions", "Appearance", "Runtime", "Files", "History", "Downloader",
+                "Companion",
             ])
         #expect(
             SettingsView.rows.map(\.systemImage) == [
                 "keyboard", "document.badge.gearshape", "paintpalette",
                 "gauge.with.dots.needle.100percent", "folder.badge.gearshape",
+                RecentsSymbol.recents,
                 "arrow.down.circle.dotted", "ipad.landscape.and.applewatch",
             ])
         #expect(
             SettingsView.rows.map(\.route) == [
                 .editorSettings, .sessionSettings, .appearanceSettings, .runtimeSettings,
-                .fileSettings, .downloaderSettings, .companionSettings,
+                .fileSettings, .recentsSettings, .downloaderSettings, .companionSettings,
             ])
         #expect(SettingsView.credits.title.key == "Credits")
         #expect(SettingsView.credits.systemImage == "list.clipboard")
@@ -57,11 +60,16 @@ struct NavigationTests {
         for item in items {
             #expect(UIImage(systemName: item.systemImage) != nil, "\(item.systemImage)")
         }
+        for name in [
+            RecentsSymbol.showInFiles, RecentsSymbol.hide, RecentsSymbol.pin, RecentsSymbol.unpin,
+        ] {
+            #expect(UIImage(systemName: name) != nil, "\(name)")
+        }
     }
 
     @Test func placeholderTitles() {
         let expected: [(Route, String)] = [
-            (.resumeSession, "Resume Session"), (.sessions, "History"),
+            (.resumeSession, "Resume Session"),
             (.editorSettings, "Editor"), (.sessionSettings, "Sessions"),
             (.runtimeSettings, "Runtime"),
             (.companionSettings, "Companion"), (.downloader, "Downloader"),
@@ -116,6 +124,28 @@ struct NavigationTests {
         }
     }
 
+    /// A folder's title is as much of its path as fits, dropping the folders
+    /// nearest the root first.
+    @Test func folderTitles() {
+        let deep = FilePath(components: ["scripts", "demo.dial", "lib"])
+        #expect(
+            FolderScreen.titles(for: deep, showExtensions: true) == [
+                "/scripts/demo.dial/lib", "…/demo.dial/lib", "…/lib",
+            ])
+        #expect(
+            FolderScreen.titles(for: deep, showExtensions: false) == [
+                "/scripts/demo/lib", "…/demo/lib", "…/lib",
+            ])
+        #expect(
+            FolderScreen.titles(for: FilePath(components: ["notes"]), showExtensions: true) == [
+                "/notes"
+            ])
+        #expect(FolderScreen.titles(for: .root, showExtensions: true) == ["Files"])
+        // The title's room, measured on watchOS 27's 49 mm Ultra and 42 mm.
+        #expect(TitleFitter.width(screen: 211) == 135)
+        #expect(TitleFitter.width(screen: 187) == 123)
+    }
+
     /// In select mode the buttons are Done, Copy and More; Copy is grayed out
     /// with nothing selected.
     @Test func selectModeButtons() {
@@ -147,12 +177,12 @@ struct NavigationTests {
             FolderMoreScreen.Action.allCases.map(\.systemImage) == [
                 "checklist.checked", "checklist.unchecked", "square.and.arrow.up", "trash",
                 "arrow.up.arrow.down", "square.grid.3x1.below.line.grid.1x2", "eye", "info.circle",
-                "trash", "trash.fill", "gear",
+                "list.bullet.indent", "trash", "trash.fill", "gear",
             ])
         #expect(
             FolderMoreScreen.Action.allCases.map(\.title.key) == [
                 "Select All", "Deselect All", "Share", "Delete Selected", "Sort", "Group",
-                "Show Hidden", "Folder Info", "Delete", "Trash", "Settings",
+                "Show Hidden", "Folder Info", "Path", "Delete", "Trash", "Settings",
             ])
         for action in FolderMoreScreen.Action.allCases {
             #expect(UIImage(systemName: action.systemImage) != nil, "\(action.systemImage)")

@@ -89,7 +89,7 @@ actor FileOperations {
         make: (URL) throws -> Void
     ) async throws -> FilePath {
         try check(name, kind: kind, in: folder)
-        pruneClipboard()
+        pruneHeld()
         let staging = FilesStores.staging(in: stores)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         let staged = staging.appending(path: UUID().uuidString, directoryHint: .notDirectory)
@@ -122,10 +122,11 @@ actor FileOperations {
         // to rename.
         if name == old { return path }
         try check(name, kind: kind, in: folder, current: old)
-        pruneClipboard()
+        pruneHeld()
         let renamed = folder.appending(name)
         try place(url, to: renamed.url(in: root), named: name, goneName: old)
         updateClipboard { $0.following(path, to: renamed) }
+        updateRecents { $0.following(path, to: renamed) }
         record(
             Step(kind: .rename, changes: [Step.Change(from: .files(path), to: .files(renamed))]))
         await sizes.forget(containing: url)
@@ -148,12 +149,14 @@ actor FileOperations {
             } catch {
                 let done = paths.prefix(deleted.count)
                 updateClipboard { held in done.reduce(held) { $0.dropping(within: $1) } }
+                updateRecents { held in done.reduce(held) { $0.dropping(within: $1) } }
                 record(Self.deleteStep(done, deleted))
                 await forget(done.map { $0.url(in: root) })
                 throw PartialFailure.of(error, after: deleted)
             }
         }
         updateClipboard { held in paths.reduce(held) { $0.dropping(within: $1) } }
+        updateRecents { held in paths.reduce(held) { $0.dropping(within: $1) } }
         record(Self.deleteStep(paths, deleted))
         await forget(paths.map { $0.url(in: root) })
         return deleted
@@ -220,7 +223,7 @@ actor FileOperations {
     /// file now stands. Returns where it went.
     func restore(_ item: BinItem, timeZone: TimeZone = .current) async throws -> Restored {
         bin.tidy()
-        pruneClipboard()
+        pruneHeld()
         let restored = try moveOutOfBin(item, timeZone: timeZone)
         record(Self.restoreStep([restored]))
         await forget([restored.path.url(in: root)])
@@ -240,7 +243,7 @@ actor FileOperations {
         var restored: [Restored] = []
         let bin = self.bin
         bin.tidy()
-        pruneClipboard()
+        pruneHeld()
         let newestFirst = items.sorted { $0.deleted > $1.deleted }
         for item in newestFirst {
             do {

@@ -31,6 +31,22 @@ struct DebugPathTests {
             Route.debugPath("settings/downloader-settings", creditsPages: pages) == [
                 .settings, .downloaderSettings,
             ])
+        #expect(Route.debugPath("recents", creditsPages: pages) == [.recents])
+        #expect(
+            Route.debugPath("settings/recents-settings", creditsPages: pages) == [
+                .settings, .recentsSettings,
+            ])
+    }
+
+    /// `path:` opens a folder's Path over the folders.
+    @Test func opensAFoldersPath() {
+        let scripts = FilePath(components: ["scripts"])
+        let lib = scripts.appending("lib")
+        #expect(
+            Route.debugPath("path:scripts/lib", creditsPages: pages) == [
+                .files, .folder(scripts), .folder(lib), .path(lib),
+            ])
+        #expect(Route.debugPath("files/path:", creditsPages: pages) == [.files, .path(.root)])
     }
 
     /// `more:` opens an item's More screen over the folders it's in.

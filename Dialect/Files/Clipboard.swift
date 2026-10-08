@@ -80,10 +80,11 @@ extension FileOperations {
         try clipboard.write([])
     }
 
-    /// Drops what's gone from the clipboard, before Files places anything that
-    /// could take a held path.
-    func pruneClipboard() {
+    /// Drops what's gone from the clipboard and Recents, before Files places
+    /// anything that could take a path either holds.
+    func pruneHeld() {
         updateClipboard { $0 }
+        updateRecents { $0 }
     }
 
     /// Changes what the clipboard holds after Files has changed the items,

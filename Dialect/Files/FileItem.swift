@@ -13,7 +13,18 @@ struct FileItem: Identifiable, Hashable, Sendable {
     let modified: Date?
     let isReadOnly: Bool
 
+    /// Listed as a Document until the text-like check, which `FileKinds` makes
+    /// after the listing.
+    var needsCheck = false
+
     var id: FilePath { path }
+
+    /// The item with the kind the text-like check found.
+    func checked(as kind: FileKind) -> FileItem {
+        return FileItem(
+            path: path, kind: kind, isDirectory: isDirectory, size: size, created: created,
+            modified: modified, isReadOnly: isReadOnly)
+    }
 
     /// The full name, with its extension; empty at the root.
     var name: String { path.name ?? "" }
@@ -52,17 +63,23 @@ enum FileListing {
 
     /// A folder's items, unsorted. Dotfiles are left out unless `showHidden`.
     /// Throws when the folder can't be read, such as when it's gone.
+    ///
+    /// With `checking`, a file whose extension Files doesn't know takes the
+    /// kind found before, or is listed unchecked, to be checked afterward.
+    /// Without, it's checked here.
     static func items(
-        in folder: FilePath, root: URL, showHidden: Bool, textExtensions: Set<String>
+        in folder: FilePath, root: URL, showHidden: Bool, textExtensions: Set<String>,
+        checking kinds: FileKinds? = nil
     ) throws -> [FileItem] {
-        // Resolved, as listing a link to a folder fails with "Not a directory".
         let urls = try FileManager.default.contentsOfDirectory(
             at: folder.url(in: root).resolvingSymlinksInPath(),
             includingPropertiesForKeys: Array(keys))
         return urls.compactMap { url in
             let name = url.lastPathComponent
             guard showHidden || !name.hasPrefix(".") else { return nil }
-            return item(path: folder.appending(name), url: url, textExtensions: textExtensions)
+            return item(
+                path: folder.appending(name), url: url, textExtensions: textExtensions,
+                kinds: kinds)
         }
     }
 
@@ -76,7 +93,9 @@ enum FileListing {
 
     /// An item whose attributes can't be read, such as a broken symbolic link,
     /// is listed as a binary file with nothing known about it.
-    private static func item(path: FilePath, url: URL, textExtensions: Set<String>) -> FileItem {
+    private static func item(
+        path: FilePath, url: URL, textExtensions: Set<String>, kinds: FileKinds? = nil
+    ) -> FileItem {
         var values = try? url.resourceValues(forKeys: keys)
         if values?.isSymbolicLink == true {
             // A link is shown as what it leads to.
@@ -91,20 +110,31 @@ enum FileListing {
                 modified: nil, isReadOnly: false)
         }
         let isDirectory = values.isDirectory ?? false
-        let kind: FileKind
+        let size = isDirectory ? nil : values.fileSize.map(Int64.init)
+        let modified = values.contentModificationDate
+        var kind: FileKind
+        var needsCheck = false
         if isDirectory || values.isRegularFile == true {
-            kind =
-                FileKind.classify(
-                    name: path.name ?? "", isDirectory: isDirectory, textExtensions: textExtensions)
-                ?? FileKind.sniff(url)
+            if let known = FileKind.classify(
+                name: path.name ?? "", isDirectory: isDirectory, textExtensions: textExtensions)
+            {
+                kind = known
+            } else if let kinds {
+                let cached = kinds.cached(path, size: size, modified: modified)
+                kind = cached ?? .otherText
+                needsCheck = cached == nil
+            } else {
+                kind = FileKind.sniff(url)
+            }
         } else {
             // A pipe, socket or device: never opened, as opening a pipe waits for a writer.
             kind = .binary
         }
-        return FileItem(
-            path: path, kind: kind, isDirectory: isDirectory,
-            size: isDirectory ? nil : values.fileSize.map(Int64.init),
-            created: values.creationDate, modified: values.contentModificationDate,
+        var item = FileItem(
+            path: path, kind: kind, isDirectory: isDirectory, size: size,
+            created: values.creationDate, modified: modified,
             isReadOnly: values.isWritable == false)
+        item.needsCheck = needsCheck
+        return item
     }
 }

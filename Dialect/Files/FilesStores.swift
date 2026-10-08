@@ -26,6 +26,11 @@ enum FilesStores {
         return stores.appending(path: "Clipboard.json", directoryHint: .notDirectory)
     }
 
+    /// What was opened last.
+    static func recents(in stores: URL) -> URL {
+        return stores.appending(path: "Recents.json", directoryHint: .notDirectory)
+    }
+
     /// The undo history.
     static func history(in stores: URL) -> URL {
         return stores.appending(path: "History.json", directoryHint: .notDirectory)

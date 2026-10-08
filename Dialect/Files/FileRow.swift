@@ -43,6 +43,9 @@ struct FileRow: View {
 
     /// Whether it's selected, in select mode; `nil` outside it.
     var isSelected: Bool?
+
+    /// Show in Files' highlight, in place of the row's platter.
+    var highlight: Color?
     let open: () -> Void
     let more: () -> Void
     let delete: () -> Void
@@ -58,6 +61,11 @@ struct FileRow: View {
     private var showsDetails: Bool { style.showDetails || isSelected != nil }
 
     var body: some View {
+        content
+            .listItemTint(highlight)
+    }
+
+    @ViewBuilder private var content: some View {
         if let isSelected {
             label(isSelected: isSelected)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -172,5 +180,26 @@ struct SelectionCircle: View {
             .font(.title3)
             .foregroundStyle(isSelected ? accent : .secondary)
             .accessibilityHidden(true)
+    }
+}
+
+/// Show in Files' highlight: the row's platter blended toward the accent. It's
+/// a list item tint, animated by hand.
+enum RowHighlight {
+    /// How far toward the accent a fully lit row goes.
+    static let strength: Float = 0.45
+
+    /// The platter a list row's button draws: (34, 34, 35).
+    static let platter = Color.Resolved(
+        colorSpace: .sRGB, red: 34 / 255, green: 34 / 255, blue: 35 / 255)
+
+    /// Blended in sRGB by hand, as `Color.mix`'s colors weren't redrawn as they
+    /// changed.
+    static func color(accent: Color.Resolved, amount: Double) -> Color.Resolved {
+        let t = strength * Float(amount)
+        func blend(_ from: Float, _ to: Float) -> Float { from + (to - from) * t }
+        return Color.Resolved(
+            colorSpace: .sRGB, red: blend(platter.red, accent.red),
+            green: blend(platter.green, accent.green), blue: blend(platter.blue, accent.blue))
     }
 }

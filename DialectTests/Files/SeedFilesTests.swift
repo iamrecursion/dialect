@@ -108,6 +108,19 @@ struct SeedFilesTests {
         #expect(try !names(root, ["scripts"]).contains("draft.scm"))
     }
 
+    /// Recents holds a file in a folder, a session and a script, all there.
+    @Test func seedsRecents() throws {
+        let root = try TemporaryRoot()
+        let stores = try TemporaryRoot()
+        try SeedFiles.build(at: root.url, stores: stores.url, now: now)
+        let recents = Recents(url: FilesStores.recents(in: stores.url))
+        let expected = ["notes/todo.txt", "demo.dial", "scripts/prelude.scm"].map(FilePath.init)
+        #expect(recents.paths() == expected)
+        #expect(
+            recents.listing(root: root.url, textExtensions: [], showHidden: false, limit: 5).all
+                .map(\.path) == expected)
+    }
+
     /// The bin starts again from scratch too.
     @Test func rebuildsTheBinFromScratch() throws {
         let root = try TemporaryRoot()

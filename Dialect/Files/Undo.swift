@@ -141,7 +141,7 @@ extension FileOperations {
         if !confirmed && !changed.isEmpty {
             throw UndoChanged(undoing: undoing, names: changed.compactMap(\.name))
         }
-        pruneClipboard()
+        pruneHeld()
         // An undone Restore goes back with its old deletion date. Anything else, or changed since,
         // goes back as a new deletion, so it can't expire at once.
         let restoring = undoing && step.kind == .restore
@@ -249,18 +249,21 @@ extension FileOperations {
         return item
     }
 
-    /// Brings the clipboard up to date and drops the changed folders' totals.
+    /// Brings the clipboard and Recents up to date and drops the changed
+    /// folders' totals.
     private func finish(_ done: [Step.Change], folders: [FilePath]) async {
+        let follow: ([FilePath]) -> [FilePath] = { held in
+            done.reduce(held) { held, change in
+                guard case .files(let path) = change.from else { return held }
+                if case .files(let new) = change.to { return held.following(path, to: new) }
+                return held.dropping(within: path)
+            }
+        }
+        updateClipboard(follow)
+        updateRecents(follow)
         var changed = folders.map { $0.url(in: root) }
         for change in done {
-            if case .files(let path) = change.from {
-                changed.append(path.url(in: root))
-                if case .files(let new) = change.to {
-                    updateClipboard { $0.following(path, to: new) }
-                } else {
-                    updateClipboard { $0.dropping(within: path) }
-                }
-            }
+            if case .files(let path) = change.from { changed.append(path.url(in: root)) }
             if case .files(let path) = change.to { changed.append(path.url(in: root)) }
         }
         await forget(changed)

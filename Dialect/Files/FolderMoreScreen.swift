@@ -9,7 +9,7 @@ struct FolderMoreScreen: View {
 
     enum Action: CaseIterable {
         case selectAll, deselectAll, share, deleteSelected
-        case sort, group, showHidden, folderInfo, delete, trash, settings
+        case sort, group, showHidden, folderInfo, path, delete, trash, settings
 
         /// Show Hidden's title is for when hidden items are hidden; the screen
         /// shows Hide Hidden while they're shown.
@@ -23,6 +23,7 @@ struct FolderMoreScreen: View {
             case .group: return "Group"
             case .showHidden: return "Show Hidden"
             case .folderInfo: return "Folder Info"
+            case .path: return "Path"
             case .delete: return "Delete"
             case .trash: return "Trash"
             case .settings: return "Settings"
@@ -39,6 +40,7 @@ struct FolderMoreScreen: View {
             case .group: return "square.grid.3x1.below.line.grid.1x2"
             case .showHidden: return "eye"
             case .folderInfo: return "info.circle"
+            case .path: return "list.bullet.indent"
             case .delete: return "trash"
             case .trash: return "trash.fill"
             case .settings: return "gear"
@@ -109,6 +111,7 @@ struct FolderMoreScreen: View {
                 if Self.sharesFolder(isRoot: path == .root, selecting: isSelecting) {
                     ShareRow(shared: .archive([path], name: Shared.archiveName(of: path)))
                 }
+                row(.path)
             }
             Section {
                 if Self.deleteActions(isRoot: path == .root, selecting: isSelecting).contains(
@@ -197,6 +200,7 @@ struct FolderMoreScreen: View {
             showHidden.toggle()
             navigation.pop()
         case .folderInfo: navigation.replaceTop(with: .folderInfo(path))
+        case .path: navigation.replaceTop(with: .path(path))
         case .delete: delete()
         case .trash: navigation.replaceTop(with: .bin)
         case .settings: navigation.replaceTop(with: .settings)

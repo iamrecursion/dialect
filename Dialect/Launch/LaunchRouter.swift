@@ -49,8 +49,7 @@ final class LaunchRouter {
 }
 
 /// Stands in for the session store until sessions exist: whether there is a
-/// latest session to resume is a debug setting, so both outcomes can be tried
-/// on the watch.
+/// latest session to resume is a debug launch argument.
 enum FakeSessions {
     static let key = "pretendSessionExists"
 

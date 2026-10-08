@@ -13,6 +13,8 @@ struct SettingsView: View {
             route: .runtimeSettings),
         MenuItem(title: "Files", systemImage: "folder.badge.gearshape", route: .fileSettings),
         MenuItem(
+            title: "History", systemImage: RecentsSymbol.recents, route: .recentsSettings),
+        MenuItem(
             title: "Downloader", systemImage: "arrow.down.circle.dotted",
             route: .downloaderSettings),
         MenuItem(
@@ -21,8 +23,6 @@ struct SettingsView: View {
     ]
 
     static let credits = MenuItem(title: "Credits", systemImage: "list.clipboard", route: .credits)
-
-    @AppStorage(FakeSessions.key) private var pretendSessionExists = false
 
     var body: some View {
         List {
@@ -38,13 +38,6 @@ struct SettingsView: View {
                     MenuRowLabel(item: Self.credits)
                 }
             }
-            #if DEBUG
-                Section("Developer") {
-                    // Until sessions exist: try both ways Resume or New can go.
-                    Toggle("Pretend a session exists", isOn: $pretendSessionExists)
-                    NavigationLink("Complications") { ComplicationGallery() }
-                }
-            #endif
         }
         .navigationTitle("Settings")
     }

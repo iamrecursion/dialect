@@ -1,3 +1,4 @@
+import SwiftUI
 import Testing
 
 @testable import Dialect
@@ -155,6 +156,7 @@ struct NavigationRuleTests {
         #expect(Route.folder(notes).filePath == notes)
         #expect(Route.newItem(.session, in: notes).filePath == notes)
         #expect(Route.rename(notes).filePath == notes)
+        #expect(Route.path(notes).filePath == notes)
         #expect(Route.bin.filePath == nil)
         #expect(Route.settings.filePath == nil)
         #expect(Route.folderRoute(for: .root) == .files)
@@ -163,6 +165,150 @@ struct NavigationRuleTests {
         #expect(notes.isWithin(notes))
         #expect(!FilePath(components: ["notesy"]).isWithin(notes))
         #expect(notes.isWithin(.root))
+    }
+
+    // MARK: Show in Files
+
+    /// The folders are pushed, so it animates as a push, then what was under
+    /// them goes, so Back climbs the folders to the main menu. The reveal waits
+    /// for that, as dropping what's under the folder rebuilds its screen.
+    @Test func showPushesTheFoldersThenDropsWhatWasUnder() async {
+        let item = FilePath(components: ["a", "b", "x.txt"])
+        let navigation = Navigation(path: [.recents])
+        navigation.replaceDelay = .zero
+        navigation.show(item)
+        let folders: [Route] = [
+            .files, .folder(FilePath(components: ["a"])), .folder(item.parent!),
+        ]
+        #expect(navigation.path == [.recents] + folders)
+        #expect(navigation.revealing == nil)
+        await navigation.pendingShow?.value
+        #expect(navigation.path == folders)
+        #expect(navigation.revealing == item)
+    }
+
+    /// A replace made before the drop, such as from an item's More, leaves it
+    /// to happen.
+    @Test func showKeepsItsDropThroughAReplace() async {
+        let item = FilePath(components: ["notes", "todo.txt"])
+        let navigation = Navigation(path: [.recents])
+        navigation.replaceDelay = .zero
+        navigation.show(item)
+        navigation.push(.itemMore(item))
+        navigation.replaceTop(with: .folderInfo(item))
+        await navigation.pendingShow?.value
+        await navigation.pendingDrop?.value
+        #expect(navigation.path == Navigation.folders(to: notes) + [.folderInfo(item)])
+    }
+
+    @Test func showsAnItemAtTheRoot() async {
+        let navigation = Navigation(path: [.recents])
+        navigation.replaceDelay = .zero
+        navigation.show(FilePath(components: ["readme"]))
+        await navigation.pendingShow?.value
+        #expect(navigation.path == [.files])
+    }
+
+    /// Back before the drop still leaves Files at the bottom; Back all the way
+    /// to Recents leaves it be.
+    @Test func showDropsWhatWasUnderAfterABack() async {
+        let item = FilePath(components: ["notes", "todo.txt"])
+        let navigation = Navigation(path: [.recents])
+        navigation.replaceDelay = .zero
+        navigation.show(item)
+        navigation.pop()
+        await navigation.pendingShow?.value
+        #expect(navigation.path == [.files])
+        #expect(navigation.revealing == nil)
+
+        let back = Navigation(path: [.recents])
+        back.replaceDelay = .zero
+        back.show(item)
+        back.path = [.recents]
+        await back.pendingShow?.value
+        #expect(back.path == [.recents])
+    }
+
+    /// Only the item's folder has the reveal, until it ends it.
+    @Test func theRevealLastsUntilItsFolderEndsIt() async {
+        let item = FilePath(components: ["notes", "todo.txt"])
+        let navigation = Navigation(path: [.recents])
+        navigation.replaceDelay = .zero
+        navigation.show(item)
+        await navigation.pendingShow?.value
+        #expect(navigation.reveal(in: .root) == nil)
+        #expect(navigation.reveal(in: FilePath(components: ["notes"])) == item)
+        #expect(navigation.reveal(in: FilePath(components: ["notes"])) == item)
+        navigation.endReveal()
+        #expect(navigation.reveal(in: FilePath(components: ["notes"])) == nil)
+    }
+
+    /// A reveal not taken goes once its folder is no longer on top, so a later
+    /// visit doesn't highlight anything.
+    @Test func theRevealGoesWhenItsFolderLeavesTheTop() async {
+        let item = FilePath(components: ["notes", "todo.txt"])
+        let navigation = Navigation(path: [.recents])
+        navigation.replaceDelay = .zero
+        navigation.show(item)
+        await navigation.pendingShow?.value
+        #expect(navigation.revealing == item)
+        navigation.push(.folderMore(FilePath(components: ["notes"])))
+        #expect(navigation.revealing == nil)
+
+        navigation.path = [.recents]
+        navigation.show(item)
+        await navigation.pendingShow?.value
+        navigation.path.removeLast()
+        #expect(navigation.revealing == nil)
+    }
+
+    /// Showing a hidden item lists hidden items in its folder while the folder
+    /// stays on the path, whatever Show Hidden says.
+    @Test func showingAHiddenItemShowsHiddenItemsInItsFolder() async {
+        let item = FilePath(components: ["notes", ".draft.md"])
+        let navigation = Navigation(path: [.recents])
+        navigation.replaceDelay = .zero
+        navigation.show(item)
+        await navigation.pendingShow?.value
+        #expect(navigation.showsHidden(in: notes))
+        #expect(!navigation.showsHidden(in: .root))
+
+        // Screens over it keep it; leaving the folder ends it.
+        navigation.push(.folderMore(notes))
+        #expect(navigation.showsHidden(in: notes))
+        navigation.pop()
+        navigation.pop()
+        #expect(!navigation.showsHidden(in: notes))
+        navigation.push(.folder(notes))
+        #expect(!navigation.showsHidden(in: notes))
+    }
+
+    /// An item that isn't hidden, even inside a hidden folder, is listed
+    /// anyway.
+    @Test func showingAnItemThatIsntHiddenLeavesHiddenItemsHidden() async {
+        let navigation = Navigation(path: [.recents])
+        navigation.replaceDelay = .zero
+        navigation.show(FilePath(components: [".config", "init.scm"]))
+        await navigation.pendingShow?.value
+        #expect(!navigation.showsHidden(in: FilePath(components: [".config"])))
+        #expect(!navigation.showsHidden(in: .root))
+    }
+
+    /// The highlight starts from the rows' own platter, so it fades into it.
+    @Test func theHighlightFadesIntoThePlatter() {
+        let accent = Color.Resolved(colorSpace: .sRGB, red: 0.5, green: 0.8, blue: 0.4)
+        let off = RowHighlight.color(accent: accent, amount: 0)
+        #expect(off.red == RowHighlight.platter.red)
+        #expect(off.blue == RowHighlight.platter.blue)
+        let lit = RowHighlight.color(accent: accent, amount: 1)
+        let expected = RowHighlight.platter.green + (0.8 - RowHighlight.platter.green) * 0.45
+        #expect(abs(lit.green - expected) < 0.001)
+    }
+
+    @Test func popsToTheMainMenu() {
+        let navigation = Navigation(path: [.files, .folder(notes), .path(notes)])
+        navigation.popToRoot()
+        #expect(navigation.path.isEmpty)
     }
 
     @Test func replacingAnEmptyNavigationPushes() {

@@ -100,11 +100,13 @@ class FilesUITestCase: XCTestCase {
         target.tap()
     }
 
-    /// Waits for the navigation bar's title. A folder's row has its name too.
+    /// Waits for the navigation bar's title. A folder's row has its name too. A
+    /// folder's title is its path, so a folder's name matches its last part.
     @MainActor
     func waitForTitle(_ title: String) {
-        XCTAssertTrue(
-            app.navigationBars.staticTexts[title].waitForExistence(timeout: 5), "not on \(title)")
+        let match = app.navigationBars.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@ OR label ENDSWITH %@", title, "/" + title))
+        XCTAssertTrue(match.firstMatch.waitForExistence(timeout: 5), "not on \(title)")
     }
 
     /// The element whose label contains this: Info's header and rows each read
