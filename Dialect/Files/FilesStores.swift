@@ -11,6 +11,11 @@ enum FilesStores {
         return stores.appending(path: "Staging", directoryHint: .isDirectory)
     }
 
+    /// Where what Share sends is prepared.
+    static func sharing(in stores: URL) -> URL {
+        return stores.appending(path: "Sharing", directoryHint: .isDirectory)
+    }
+
     /// Where deleted items are kept until they expire.
     static func bin(in stores: URL) -> URL {
         return stores.appending(path: "Bin", directoryHint: .isDirectory)

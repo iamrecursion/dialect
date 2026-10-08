@@ -8,12 +8,17 @@ struct FolderMoreScreen: View {
     let path: FilePath
 
     enum Action: CaseIterable {
+        case selectAll, deselectAll, share, deleteSelected
         case sort, group, showHidden, folderInfo, delete, trash, settings
 
         /// Show Hidden's title is for when hidden items are hidden; the screen
         /// shows Hide Hidden while they're shown.
         var title: LocalizedStringResource {
             switch self {
+            case .selectAll: return "Select All"
+            case .deselectAll: return "Deselect All"
+            case .share: return "Share"
+            case .deleteSelected: return "Delete Selected"
             case .sort: return "Sort"
             case .group: return "Group"
             case .showHidden: return "Show Hidden"
@@ -26,6 +31,10 @@ struct FolderMoreScreen: View {
 
         var systemImage: String {
             switch self {
+            case .selectAll: return "checklist.checked"
+            case .deselectAll: return "checklist.unchecked"
+            case .share: return ShareSymbol.share
+            case .deleteSelected: return "trash"
             case .sort: return "arrow.up.arrow.down"
             case .group: return "square.grid.3x1.below.line.grid.1x2"
             case .showHidden: return "eye"
@@ -37,24 +46,74 @@ struct FolderMoreScreen: View {
         }
     }
 
+    /// Select mode's section: Select All, or Deselect All once everything is
+    /// selected, then Share and Delete Selected.
+    static func selectActions(hasEverything: Bool) -> [Action] {
+        return [hasEverything ? .deselectAll : .selectAll, .share, .deleteSelected]
+    }
+
+    /// The section with Delete, which the root doesn't have, and which select
+    /// mode hides so it can't be mistaken for Delete Selected.
+    static func deleteActions(isRoot: Bool, selecting: Bool) -> [Action] {
+        return isRoot || selecting ? [.trash] : [.delete, .trash]
+    }
+
+    /// Whether More shares the folder itself, zipped. The root has no Share,
+    /// and in select mode Share sends the selection instead.
+    static func sharesFolder(isRoot: Bool, selecting: Bool) -> Bool {
+        return !isRoot && !selecting
+    }
+
+    /// What acts on the selection is grayed out with nothing selected.
+    static func isDisabled(_ action: Action, selectedCount: Int) -> Bool {
+        return [.share, .deleteSelected].contains(action) && selectedCount == 0
+    }
+
     @Environment(Navigation.self) private var navigation
+    @Environment(FileSelection.self) private var selection
     @AppStorage(FileSettings.showHiddenKey) private var showHidden =
         FileSettings.showHiddenDefault
 
     @State private var binIsEmpty = true
+
+    /// What Share sends, worked out as the screen appears in select mode.
+    @State private var shared: Shared?
+
+    /// Set once Share has sent the selection: select mode ends as More is left.
+    @State private var sent = false
     @State private var failure: OperationFailure?
     @State private var deleting = false
 
     var body: some View {
         List {
+            if isSelecting {
+                Section {
+                    ForEach(
+                        Self.selectActions(hasEverything: selection.hasEverything), id: \.self
+                    ) { action in
+                        Group {
+                            if action == .share {
+                                shareRow
+                            } else {
+                                row(action)
+                            }
+                        }
+                        .disabled(Self.isDisabled(action, selectedCount: selection.items.count))
+                    }
+                }
+            }
             UndoRows(here: path)
                 .disabled(deleting)
             Section {
                 ForEach([Action.sort, .group, .showHidden, .folderInfo], id: \.self, content: row)
+                if Self.sharesFolder(isRoot: path == .root, selecting: isSelecting) {
+                    ShareRow(shared: .archive([path], name: Shared.archiveName(of: path)))
+                }
             }
             Section {
-                // The root has no Delete.
-                if path != .root {
+                if Self.deleteActions(isRoot: path == .root, selecting: isSelecting).contains(
+                    .delete)
+                {
                     row(.delete)
                         .disabled(deleting)
                 }
@@ -68,13 +127,41 @@ struct FolderMoreScreen: View {
         }
         .navigationTitle("More")
         .operationFailureAlert($failure)
+        .onDisappear {
+            if sent { selection.end() }
+        }
         .task {
             let bin = FilesRoot.operations.bin
             let days = FileSettings.emptyTrashAfter()
-            binIsEmpty = await Task.detached {
+            let (paths, root) = (isSelecting ? selection.selected : [], FilesRoot.url)
+            async let empty = Task.detached {
                 bin.items().allSatisfy { $0.isExpired(now: Date(), after: days) }
             }.value
+            async let sending = Task.detached {
+                Shared.of(paths) { path in
+                    FileOperations.kind(at: path.url(in: root)).map { $0 != .file } ?? false
+                }
+            }.value
+            shared = await sending
+            binIsEmpty = await empty
         }
+    }
+
+    /// Grayed out until what it sends is worked out.
+    @ViewBuilder private var shareRow: some View {
+        if let shared {
+            ShareRow(shared: shared) { sent = true }
+        } else {
+            Button {
+            } label: {
+                MenuRowLabel(title: "Share", systemImage: ShareSymbol.share)
+            }
+            .disabled(true)
+        }
+    }
+
+    private var isSelecting: Bool {
+        return selection.isSelecting(on: Route.folderRoute(for: path))
     }
 
     private func row(_ action: Action) -> some View {
@@ -91,6 +178,19 @@ struct FolderMoreScreen: View {
 
     private func perform(_ action: Action) {
         switch action {
+        case .selectAll:
+            selection.selectAll()
+            navigation.pop()
+        case .deselectAll:
+            selection.deselectAll()
+            navigation.pop()
+        case .share:
+            // The row is a `ShareLink`, which acts by itself.
+            break
+        case .deleteSelected:
+            // The folder deletes them, so their rows leave as More closes.
+            selection.deleteSelected()
+            navigation.pop()
         case .sort: navigation.replaceTop(with: .sort(path))
         case .group: navigation.replaceTop(with: .group(path))
         case .showHidden:

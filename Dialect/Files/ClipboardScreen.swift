@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// What the clipboard holds, with Paste and Move into the folder it was opened
-/// from, and Clear Clipboard.
+/// What the clipboard holds, with Select, Paste and Move into the folder it was
+/// opened from, and Clear Clipboard.
 struct ClipboardScreen: View {
     let folder: FilePath
 
     @Environment(Navigation.self) private var navigation
+    @Environment(FileSelection.self) private var selection
     @AppStorage(FileSettings.showExtensionsKey) private var showExtensions =
         FileSettings.showExtensionsDefault
 
@@ -46,18 +47,15 @@ struct ClipboardScreen: View {
     }
 
     @ViewBuilder private func actions(isEmpty: Bool) -> some View {
-        // Select mode isn't built yet.
         Section {
+            // Select mode starts with nothing selected, back on the folder.
             Button {
+                selection.begin(on: folderRoute)
+                navigation.pop(to: folderRoute)
             } label: {
-                MenuRowLabel(title: "Select", systemImage: "checkmark.circle.badge.plus")
-            }
-            Button {
-            } label: {
-                MenuRowLabel(title: "Copy", systemImage: ClipboardSymbol.copy)
+                MenuRowLabel(title: "Select", systemImage: SelectSymbol.select)
             }
         }
-        .disabled(true)
         Section {
             Button {
                 transfer = TransferRequest(kind: .paste, folder: folder)

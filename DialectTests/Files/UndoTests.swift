@@ -296,6 +296,28 @@ struct UndoTests {
         #expect(setup.bin.items().isEmpty)
     }
 
+    /// Restore Selected is one step: undone, its items go back into the Trash
+    /// as they were, beside what wasn't selected.
+    @Test func undoesRestoreSelected() async throws {
+        let setup = try OperationsSetup()
+        try setup.root.file("a.txt", text: "a")
+        try setup.root.file("b.txt", text: "b")
+        try setup.root.file("c.txt", text: "c")
+        let deleted = try await setup.operations.delete([
+            FilePath("a.txt"), FilePath("b.txt"), FilePath("c.txt"),
+        ])
+        let before = setup.bin.items()
+        _ = try await setup.operations.restore(deleted.filter { $0.name != "b.txt" })
+        #expect(try setup.names() == ["a.txt", "c.txt"])
+
+        _ = try await setup.operations.undo()
+        #expect(try setup.names().isEmpty)
+        #expect(setup.bin.items() == before)
+        _ = try await setup.operations.redo()
+        #expect(try setup.names() == ["a.txt", "c.txt"])
+        #expect(setup.bin.items().map(\.name) == ["b.txt"])
+    }
+
     /// A folder renamed, then a file inside it: the stack undoes them in turn.
     @Test func undoesStepsWhosePathsDependOnEachOther() async throws {
         let setup = try OperationsSetup()

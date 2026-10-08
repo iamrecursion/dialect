@@ -116,16 +116,43 @@ struct NavigationTests {
         }
     }
 
+    /// In select mode the buttons are Done, Copy and More; Copy is grayed out
+    /// with nothing selected.
+    @Test func selectModeButtons() {
+        let notes = FilePath(components: ["notes"])
+        let none = FolderScreen.buttons(
+            for: notes, clipboardCount: 3, selecting: true, selectedCount: 0)
+        #expect(none.map(\.title.key) == ["Done", "Copy", "More"])
+        #expect(none.map(\.systemImage) == ["checkmark", ClipboardSymbol.copy, "ellipsis.circle"])
+        #expect(none.map(\.action) == [.done, .copy, nil])
+        #expect(none.map(\.route) == [.folder(notes), .folder(notes), .folderMore(notes)])
+        #expect(none.map(\.isDisabled) == [false, true, false])
+        #expect(none.map(\.count) == [nil, nil, nil])
+        #expect(Set(none.map(\.id)).count == 3)
+
+        let two = FolderScreen.buttons(
+            for: notes, clipboardCount: 0, selecting: true, selectedCount: 2)
+        #expect(two.map(\.isDisabled) == [false, false, false])
+        #expect(
+            FolderScreen.buttons(for: .root, clipboardCount: 0, selecting: true)[0].route == .files)
+        for item in none {
+            #expect(UIImage(systemName: item.systemImage) != nil, "\(item.systemImage)")
+        }
+        #expect(UIImage(systemName: SelectSymbol.select) != nil)
+    }
+
     /// A folder's More screen's items, in order.
     @Test func folderMoreItems() {
         #expect(
             FolderMoreScreen.Action.allCases.map(\.systemImage) == [
-                "arrow.up.arrow.down", "square.grid.3x1.below.line.grid.1x2", "eye",
-                "info.circle", "trash", "trash.fill", "gear",
+                "checklist.checked", "checklist.unchecked", "square.and.arrow.up", "trash",
+                "arrow.up.arrow.down", "square.grid.3x1.below.line.grid.1x2", "eye", "info.circle",
+                "trash", "trash.fill", "gear",
             ])
         #expect(
             FolderMoreScreen.Action.allCases.map(\.title.key) == [
-                "Sort", "Group", "Show Hidden", "Folder Info", "Delete", "Trash", "Settings",
+                "Select All", "Deselect All", "Share", "Delete Selected", "Sort", "Group",
+                "Show Hidden", "Folder Info", "Delete", "Trash", "Settings",
             ])
         for action in FolderMoreScreen.Action.allCases {
             #expect(UIImage(systemName: action.systemImage) != nil, "\(action.systemImage)")
@@ -134,11 +161,42 @@ struct NavigationTests {
         #expect(UIImage(systemName: "info.circle") != nil)
     }
 
+    /// In select mode, More starts with the selection's actions and loses the
+    /// folder's Delete.
+    @Test func folderMoreInSelectMode() {
+        #expect(
+            FolderMoreScreen.selectActions(hasEverything: false) == [
+                .selectAll, .share, .deleteSelected,
+            ])
+        #expect(
+            FolderMoreScreen.selectActions(hasEverything: true) == [
+                .deselectAll, .share, .deleteSelected,
+            ])
+        #expect(FolderMoreScreen.isDisabled(.deleteSelected, selectedCount: 0))
+        #expect(FolderMoreScreen.isDisabled(.share, selectedCount: 0))
+        #expect(!FolderMoreScreen.isDisabled(.deleteSelected, selectedCount: 1))
+        #expect(!FolderMoreScreen.isDisabled(.share, selectedCount: 1))
+        #expect(!FolderMoreScreen.isDisabled(.selectAll, selectedCount: 0))
+        #expect(
+            FolderMoreScreen.deleteActions(isRoot: false, selecting: false) == [.delete, .trash])
+        #expect(FolderMoreScreen.deleteActions(isRoot: false, selecting: true) == [.trash])
+        #expect(FolderMoreScreen.deleteActions(isRoot: true, selecting: false) == [.trash])
+        #expect(FolderMoreScreen.sharesFolder(isRoot: false, selecting: false))
+        #expect(!FolderMoreScreen.sharesFolder(isRoot: false, selecting: true))
+        #expect(!FolderMoreScreen.sharesFolder(isRoot: true, selecting: false))
+    }
+
     /// Add's items, and the bin's buttons and icons.
     @Test func addAndBinSymbols() {
         #expect(AddScreen.items.map(\.kind) == [.session, .folder, .file])
-        #expect(BinScreen.buttons.map(\.title.key) == ["Select", "More"])
-        #expect(BinScreen.buttons.map(\.isDisabled) == [true, false])
+        let buttons = BinScreen.buttons(selecting: false)
+        #expect(buttons.map(\.title.key) == ["Select", "More"])
+        #expect(buttons.map(\.action) == [.select, nil])
+        #expect(buttons.map(\.route) == [.bin, .binMore])
+        let selecting = BinScreen.buttons(selecting: true)
+        #expect(selecting.map(\.title.key) == ["Done", "More"])
+        #expect(selecting.map(\.systemImage) == ["checkmark", "ellipsis.circle"])
+        #expect(selecting.map(\.action) == [.done, nil])
         for name in [
             "folder", "document", "checkmark.circle.badge.plus", BinSymbol.restore,
             "rectangle.and.pencil.and.ellipsis", "trash", "trash.fill",

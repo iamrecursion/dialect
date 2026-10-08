@@ -41,6 +41,9 @@ struct ItemMoreScreen: View {
                             MenuRowLabel(title: "Move", systemImage: ClipboardSymbol.move)
                         }
                     }
+                    if let shared = Shared.of([path], isDirectory: { _ in info.item.isDirectory }) {
+                        ShareRow(shared: shared)
+                    }
                 }
                 .disabled(transfer != nil)
                 Section {

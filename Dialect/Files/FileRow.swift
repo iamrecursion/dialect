@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 /// The settings shaping a folder's rows, read once for all of them.
 struct FileRowStyle {
@@ -27,8 +28,11 @@ struct FileRowStyle {
 
 /// One item in a folder: its icon, its name, and its details when shown. A tap
 /// opens it; a long press, or VoiceOver's More action, opens its More screen.
-/// Swiping left offers Delete and More, and swiping right Copy, each taking a
-/// tap, as watchOS lists have no full swipe.
+/// Swiping left offers Delete and More, and swiping right Copy and Select, each
+/// taking a tap, as watchOS lists have no full swipe.
+///
+/// In select mode the row shows a selection circle and its details, has no
+/// swipes or long press, and a tap calls `open`, which toggles selection.
 ///
 /// `open` must ignore the tap that ends a long press; the folder does, as More
 /// is on top by then.
@@ -36,10 +40,14 @@ struct FileRow: View {
     let item: FileItem
     let size: Int64?
     let style: FileRowStyle
+
+    /// Whether it's selected, in select mode; `nil` outside it.
+    var isSelected: Bool?
     let open: () -> Void
     let more: () -> Void
     let delete: () -> Void
     let copy: () -> Void
+    let select: () -> Void
 
     /// As `MenuRowLabel`'s, so names line up with the menus'.
     @ScaledMetric(relativeTo: .title3) private var iconWidth: CGFloat = 30
@@ -47,17 +55,53 @@ struct FileRow: View {
 
     private var name: String { item.displayName(showExtensions: style.showExtensions) }
 
+    private var showsDetails: Bool { style.showDetails || isSelected != nil }
+
     var body: some View {
-        Button(action: open) {
+        if let isSelected {
+            label(isSelected: isSelected)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+        } else {
+            label(isSelected: nil)
+                // Simultaneous, as `onLongPressGesture` on a button swallows its taps on watchOS
+                // 27. The button's action still follows when the finger lifts; `open` ignores it
+                // once More is showing.
+                .simultaneousGesture(LongPressGesture().onEnded { _ in more() })
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive, action: delete) {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    Button(action: more) {
+                        Label("More", systemImage: "ellipsis.circle")
+                    }
+                    .tint(.gray)
+                }
+                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                    Button(action: copy) {
+                        Label("Copy", systemImage: ClipboardSymbol.copy)
+                    }
+                    .tint(accent)
+                    Button(action: select) {
+                        Label("Select", systemImage: SelectSymbol.select)
+                    }
+                    .tint(.gray)
+                }
+                .accessibilityAction(named: Text("Delete"), delete)
+                .accessibilityAction(named: Text("More"), more)
+                .accessibilityAction(named: Text("Copy"), copy)
+                .accessibilityAction(named: Text("Select"), select)
+        }
+    }
+
+    private func label(isSelected: Bool?) -> some View {
+        return Button(action: open) {
             HStack(spacing: 10) {
-                FileIcon(kind: item.kind)
-                    .font(.title3)
-                    .frame(width: iconWidth)
+                RowIcon(kind: item.kind, isSelected: isSelected, width: iconWidth)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: name)
                         .lineLimit(2)
                         .truncationMode(.middle)
-                    if style.showDetails {
+                    if showsDetails {
                         Text(verbatim: style.detail(for: item, size: size))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -66,35 +110,67 @@ struct FileRow: View {
                 Spacer(minLength: 0)
             }
         }
-        // Simultaneous, as `onLongPressGesture` on a button swallows its taps on watchOS 27. The
-        // button's action still follows when the finger lifts; `open` ignores it once More is
-        // showing.
-        .simultaneousGesture(LongPressGesture().onEnded { _ in more() })
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive, action: delete) {
-                Label("Delete", systemImage: "trash")
-            }
-            Button(action: more) {
-                Label("More", systemImage: "ellipsis.circle")
-            }
-            .tint(.gray)
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-            Button(action: copy) {
-                Label("Copy", systemImage: ClipboardSymbol.copy)
-            }
-            .tint(accent)
-        }
         .accessibilityLabel(Text(verbatim: name))
         .accessibilityValue(Text(verbatim: accessibilityValue))
-        .accessibilityAction(named: Text("Delete"), delete)
-        .accessibilityAction(named: Text("More"), more)
-        .accessibilityAction(named: Text("Copy"), copy)
     }
 
     /// The kind, then the details when they're shown.
     private var accessibilityValue: String {
         let kind = String(localized: item.kind.typeName)
-        return style.showDetails ? "\(kind), \(style.detail(for: item, size: size))" : kind
+        return showsDetails ? "\(kind), \(style.detail(for: item, size: size))" : kind
+    }
+}
+
+/// A row's icon with select mode's circle before it, or in its place where the
+/// screen is narrow to fit both.
+struct RowIcon: View {
+    let kind: FileKind
+
+    /// Whether it's selected, in select mode; `nil` outside it.
+    let isSelected: Bool?
+
+    /// The icon's slot, as `MenuRowLabel`'s.
+    let width: CGFloat
+
+    /// Whether the circle takes the icon's place.
+    nonisolated static func circleReplacesIcon(screenWidth: CGFloat, iconWidth: CGFloat) -> Bool {
+        return screenWidth < 6.5 * iconWidth
+    }
+
+    var body: some View {
+        if let isSelected {
+            if Self.circleReplacesIcon(
+                screenWidth: WKInterfaceDevice.current().screenBounds.width, iconWidth: width)
+            {
+                SelectionCircle(isSelected: isSelected)
+                    .frame(width: width)
+            } else {
+                SelectionCircle(isSelected: isSelected)
+                icon
+            }
+        } else {
+            icon
+        }
+    }
+
+    private var icon: some View {
+        return FileIcon(kind: kind)
+            .font(.title3)
+            .frame(width: width)
+    }
+}
+
+/// A row's circle in select mode, filled with a check in the accent once
+/// selected.
+struct SelectionCircle: View {
+    let isSelected: Bool
+
+    @Environment(\.dialectAccent) private var accent
+
+    var body: some View {
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.title3)
+            .foregroundStyle(isSelected ? accent : .secondary)
+            .accessibilityHidden(true)
     }
 }

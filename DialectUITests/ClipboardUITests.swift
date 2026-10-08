@@ -76,6 +76,7 @@ final class ClipboardUITests: FilesUITestCase {
         XCTAssertTrue(text(containing: " · ").waitForExistence(timeout: 10), "no Info")
         // Nothing to paste yet.
         XCTAssertFalse(app.buttons["Paste"].exists)
+        XCTAssertTrue(scrollTo(app.buttons["Share"]), "no Share")
         tapAction("Copy")
         waitForTitle("Files")
         waitForCount("1 item")

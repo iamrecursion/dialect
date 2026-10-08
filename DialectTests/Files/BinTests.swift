@@ -153,6 +153,17 @@ struct BinTests {
         #expect(
             BinMoreScreen.stoppedNote(restored: 1, dated: 1, reason: "Why.").hasPrefix(
                 "1 item was restored before Restore All stopped. 1 item came back with its"))
+        #expect(
+            BinMoreScreen.stoppedNote(restored: 2, dated: 0, selected: true, reason: "Why.")
+                == "2 items were restored before Restore Selected stopped. Why.")
+        #expect(
+            BinMoreScreen.stoppedNote(restored: 1, dated: 0, selected: true, reason: "Why.")
+                == "1 item was restored before Restore Selected stopped. Why.")
+    }
+
+    @Test func asksBeforeDeletingTheSelection() {
+        #expect(BinMoreScreen.deleteSelectedTitle(1) == "Delete 1 item permanently?")
+        #expect(BinMoreScreen.deleteSelectedTitle(3) == "Delete 3 items permanently?")
     }
 
     // MARK: Days left

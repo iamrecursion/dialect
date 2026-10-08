@@ -45,18 +45,24 @@ enum BinSymbol {
     static let restore = "checkmark.arrow.trianglehead.counterclockwise"
 }
 
-/// The bin: what's been deleted, newest first. A tap shows an item's
-/// information and swipes can restore it or delete it for good.
+/// The bin: what's been deleted, newest first. A tap shows an item's info and
+/// swipes can restore it or delete it for good. In select mode, a tap toggles
+/// the item instead, and More acts on the selection.
 struct BinScreen: View {
-    /// Select is disabled until select mode exists.
-    static let buttons = [
-        MenuItem(
-            title: "Select", systemImage: "checkmark.circle.badge.plus", route: .bin,
-            isDisabled: true),
-        MenuItem(title: "More", systemImage: "ellipsis.circle", route: .binMore),
-    ]
+    static func buttons(selecting: Bool) -> [MenuItem] {
+        return [
+            selecting
+                ? MenuItem(
+                    title: "Done", systemImage: SelectSymbol.done, route: .bin, action: .done)
+                : MenuItem(
+                    title: "Select", systemImage: SelectSymbol.select, route: .bin,
+                    action: .select),
+            MenuItem(title: "More", systemImage: "ellipsis.circle", route: .binMore),
+        ]
+    }
 
     @Environment(Navigation.self) private var navigation
+    @Environment(BinSelection.self) private var selection
     @Environment(\.dialectAccent) private var accent
     @AppStorage(FileSettings.relativeModifiedKey) private var relativeModified =
         FileSettings.relativeModifiedDefault
@@ -78,10 +84,13 @@ struct BinScreen: View {
     @State private var reads = 0
 
     var body: some View {
-        ActionList(actions: Self.buttons, perform: { navigation.push($0.route) }) {
+        ActionList(actions: Self.buttons(selecting: isSelecting), perform: perform) {
             rows
         }
-        .navigationTitle("Trash")
+        .navigationTitle(title)
+        .onChange(of: isSelecting) { _, selecting in
+            if selecting { listForSelection() }
+        }
         // Reads again each time it's back on top.
         .task(id: isOnTop) {
             if isOnTop { await load() }
@@ -115,6 +124,27 @@ struct BinScreen: View {
 
     private var isOnTop: Bool { navigation.path.last == .bin }
 
+    private var isSelecting: Bool { selection.isSelecting(on: .bin) }
+
+    private var title: Text {
+        return isSelecting
+            ? Text(verbatim: BinSelection.title(selected: selection.items.count)) : Text("Trash")
+    }
+
+    private func perform(_ button: MenuItem) {
+        switch button.action {
+        case .select: selection.begin(on: .bin)
+        case .done: selection.end()
+        case .copy, nil: navigation.push(button.route)
+        }
+    }
+
+    /// Tells the selection what the bin lists.
+    private func listForSelection() {
+        guard isSelecting, let entries else { return }
+        selection.list(entries.map(\.id).filter { !leaving.contains($0) })
+    }
+
     @ViewBuilder private var rows: some View {
         if let entries {
             let shown = entries.filter { !leaving.contains($0.id) }
@@ -127,38 +157,49 @@ struct BinScreen: View {
             }
             let now = Date()
             ForEach(shown) { entry in
-                BinRow(
-                    entry: entry,
-                    detail: BinEntry.detail(
-                        for: entry.item, now: now, relative: relativeModified, style: dateStyle,
-                        use24Hour: use24Hour,
-                        emptyAfter: emptyTrashAfter > 0 ? emptyTrashAfter : nil)
-                ) {
-                    navigation.push(.binItem(entry.id))
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        confirming = entry
-                    } label: {
-                        Label {
-                            Text("Delete Permanently")
-                        } icon: {
-                            FileSymbol.deletePermanently.image
-                        }
+                let detail = BinEntry.detail(
+                    for: entry.item, now: now, relative: relativeModified, style: dateStyle,
+                    use24Hour: use24Hour, emptyAfter: emptyTrashAfter > 0 ? emptyTrashAfter : nil)
+                if isSelecting {
+                    let isSelected = selection.items.contains(entry.id)
+                    BinRow(entry: entry, detail: detail, isSelected: isSelected) {
+                        selection.toggle(entry.id)
                     }
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                } else {
+                    swipeable(entry, detail: detail)
                 }
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    Button {
-                        restore(entry)
-                    } label: {
-                        Label("Restore", systemImage: BinSymbol.restore)
-                    }
-                    .tint(accent)
-                }
-                .accessibilityAction(named: Text("Restore")) { restore(entry) }
-                .accessibilityAction(named: Text("Delete Permanently")) { confirming = entry }
             }
         }
+    }
+
+    /// A row outside select mode: a tap opens its information, and swipes
+    /// restore it or delete it for good.
+    private func swipeable(_ entry: BinEntry, detail: [String]) -> some View {
+        return BinRow(entry: entry, detail: detail) {
+            navigation.push(.binItem(entry.id))
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                confirming = entry
+            } label: {
+                Label {
+                    Text("Delete Permanently")
+                } icon: {
+                    FileSymbol.deletePermanently.image
+                }
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button {
+                restore(entry)
+            } label: {
+                Label("Restore", systemImage: BinSymbol.restore)
+            }
+            .tint(accent)
+        }
+        .accessibilityAction(named: Text("Restore")) { restore(entry) }
+        .accessibilityAction(named: Text("Delete Permanently")) { confirming = entry }
     }
 
     /// Removes what's expired, then reads the bin off the main actor.
@@ -174,6 +215,7 @@ struct BinScreen: View {
         }.value
         guard !Task.isCancelled, read == reads else { return }
         entries = loaded
+        listForSelection()
     }
 
     private func restore(_ entry: BinEntry) {
@@ -203,10 +245,14 @@ struct BinScreen: View {
     }
 }
 
-/// One bin item: its icon, its name in the bin, and when it was deleted.
+/// One bin item: its icon, its name in the bin, and when it was deleted, with a
+/// selection circle in select mode.
 private struct BinRow: View {
     let entry: BinEntry
     let detail: [String]
+
+    /// Whether it's selected, in select mode; `nil` outside it.
+    var isSelected: Bool?
     let open: () -> Void
 
     /// As `FileRow`'s, so the bin lines up with folders.
@@ -215,9 +261,7 @@ private struct BinRow: View {
     var body: some View {
         Button(action: open) {
             HStack(spacing: 10) {
-                FileIcon(kind: entry.kind)
-                    .font(.title3)
-                    .frame(width: iconWidth)
+                RowIcon(kind: entry.kind, isSelected: isSelected, width: iconWidth)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: entry.item.name)
                         .lineLimit(2)
@@ -373,28 +417,35 @@ struct BinItemScreen: View {
     }
 }
 
-/// The bin's More: Restore All and Delete All, which act and go back.
+/// The bin's More: Restore All and Delete All, which act and go back. With a
+/// selection, Restore Selected and Delete Selected appear in their place.
 struct BinMoreScreen: View {
     @Environment(Navigation.self) private var navigation
+    @Environment(BinSelection.self) private var selection
 
     /// How many items are in the bin, read as the screen appears.
     @State private var count: Int?
     @State private var confirming = false
     @State private var note: String?
     @State private var failure: OperationFailure?
+
     /// Set while Restore All or Delete All runs, so a second tap does nothing.
     @State private var working = false
 
     var body: some View {
         List {
             Section {
-                Button(action: restoreAll) {
-                    MenuRowLabel(title: "Restore All", systemImage: BinSymbol.restore)
+                Button(action: restore) {
+                    MenuRowLabel(
+                        title: hasSelection ? "Restore Selected" : "Restore All",
+                        systemImage: BinSymbol.restore)
                 }
                 Button {
                     confirming = true
                 } label: {
-                    MenuRowLabel(title: "Delete All", symbol: .deletePermanently)
+                    MenuRowLabel(
+                        title: hasSelection ? "Delete Selected" : "Delete All",
+                        symbol: .deletePermanently)
                 }
             }
             .disabled(count == 0 || working)
@@ -405,10 +456,15 @@ struct BinMoreScreen: View {
             count = await Task.detached { bin.items().count }.value
         }
         .confirmationDialog(
-            Text(verbatim: Self.deleteAllTitle(count ?? 0)), isPresented: $confirming,
-            titleVisibility: .visible
+            Text(
+                verbatim: hasSelection
+                    ? Self.deleteSelectedTitle(selection.items.count)
+                    : Self.deleteAllTitle(count ?? 0)),
+            isPresented: $confirming, titleVisibility: .visible
         ) {
-            Button("Delete All", role: .destructive, action: deleteAll)
+            Button(hasSelection ? "Delete Selected" : "Delete All", role: .destructive) {
+                deletePermanently()
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This can't be undone.")
@@ -425,14 +481,30 @@ struct BinMoreScreen: View {
         .operationFailureAlert($failure)
     }
 
+    /// The bin's items with these IDs, read off the main actor.
+    private static func items(_ ids: [UUID], in bin: Bin) async -> [BinItem] {
+        return await Task.detached { bin.items().filter { ids.contains($0.id) } }.value
+    }
+
+    /// Whether More acts on a selection: something is selected in select mode.
+    private var hasSelection: Bool {
+        return selection.isSelecting(on: .bin) && !selection.items.isEmpty
+    }
+
+    nonisolated static func deleteSelectedTitle(_ count: Int) -> String {
+        return count == 1
+            ? String(localized: "Delete 1 item permanently?")
+            : String(localized: "Delete \(count) items permanently?")
+    }
+
     nonisolated static func deleteAllTitle(_ count: Int) -> String {
         return count == 1
             ? String(localized: "Delete 1 item permanently?")
             : String(localized: "Delete all \(count) items permanently?")
     }
 
-    /// What Restore All's alert says when some came back dated; `nil` when none
-    /// did.
+    /// What Restore All's and Restore Selected's alert says when some came back
+    /// dated; `nil` when none did.
     nonisolated static func restoreAllNote(dated: Int) -> String? {
         switch dated {
         case 0: return nil
@@ -449,13 +521,23 @@ struct BinMoreScreen: View {
         }
     }
 
-    private func restoreAll() {
+    /// Restores the selection, or everything without one, and ends select mode.
+    private func restore() {
         guard !working else { return }
         working = true
+        let selected = hasSelection ? selection.selected : nil
         Task {
             defer { working = false }
             do {
-                let restored = try await FilesRoot.operations.restoreAll()
+                let operations = FilesRoot.operations
+                let restored: [Restored]
+                if let selected {
+                    let items = await Self.items(selected, in: operations.bin)
+                    restored = try await operations.restore(items)
+                } else {
+                    restored = try await operations.restoreAll()
+                }
+                selection.end()
                 if let message = Self.restoreAllNote(
                     dated: restored.filter { !$0.isWhereItWas }.count)
                 {
@@ -464,12 +546,14 @@ struct BinMoreScreen: View {
                     navigation.pop(to: .bin)
                 }
             } catch let partial as PartialFailure<Restored> {
+                selection.end()
                 // Say how far it got.
                 failure = OperationFailure(
                     "Couldn't Restore",
                     reason: Self.stoppedNote(
                         restored: partial.done.count,
                         dated: partial.done.filter { !$0.isWhereItWas }.count,
+                        selected: selected != nil,
                         reason: partial.underlying.localizedDescription))
             } catch {
                 failure = OperationFailure("Couldn't Restore", error)
@@ -477,24 +561,44 @@ struct BinMoreScreen: View {
         }
     }
 
-    /// What Restore All says when it stops part way: how many it restored, how
-    /// many of those are dated, and why it stopped.
-    nonisolated static func stoppedNote(restored: Int, dated: Int, reason: String) -> String {
+    /// What Restore All or Restore Selected reports when it stops part way: how
+    /// many it restored, how many of those are dated, and why it stopped.
+    nonisolated static func stoppedNote(
+        restored: Int, dated: Int, selected: Bool = false, reason: String
+    ) -> String {
         let done =
-            restored == 1
-            ? String(localized: "1 item was restored before Restore All stopped.")
-            : String(localized: "\(restored) items were restored before Restore All stopped.")
+            switch (restored == 1, selected) {
+            case (true, false):
+                String(localized: "1 item was restored before Restore All stopped.")
+            case (false, false):
+                String(localized: "\(restored) items were restored before Restore All stopped.")
+            case (true, true):
+                String(localized: "1 item was restored before Restore Selected stopped.")
+            case (false, true):
+                String(
+                    localized: "\(restored) items were restored before Restore Selected stopped.")
+            }
         let dates = restoreAllNote(dated: dated).map { " \($0)" } ?? ""
         return "\(done)\(dates) \(reason)"
     }
 
-    private func deleteAll() {
+    /// Deletes the selection for good, or everything without one, and ends
+    /// select mode.
+    private func deletePermanently() {
         guard !working else { return }
         working = true
+        let selected = hasSelection ? selection.selected : nil
         Task {
             defer { working = false }
             do {
-                try await FilesRoot.operations.deleteAll()
+                let operations = FilesRoot.operations
+                if let selected {
+                    let items = await Self.items(selected, in: operations.bin)
+                    try await operations.deletePermanently(items)
+                } else {
+                    try await operations.deleteAll()
+                }
+                selection.end()
                 navigation.pop(to: .bin)
             } catch {
                 failure = OperationFailure("Couldn't Delete", error)

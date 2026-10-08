@@ -39,11 +39,28 @@ enum FolderLoader {
 /// A folder: Add, Clipboard and More, then its items, sorted and grouped as its
 /// view settings say. It's read again each time it's back on top, so changes
 /// made elsewhere show.
+///
+/// In select mode the buttons are Done, Copy and More, and a tap on a row
+/// toggles it.
 struct FolderScreen: View {
     let path: FilePath
 
-    /// Clipboard fills, with a count, while the clipboard holds items.
-    static func buttons(for path: FilePath, clipboardCount: Int) -> [MenuItem] {
+    /// Clipboard fills, with a count, while the clipboard holds items. In
+    /// select mode, Copy is grayed out with nothing selected.
+    static func buttons(
+        for path: FilePath, clipboardCount: Int, selecting: Bool = false, selectedCount: Int = 0
+    ) -> [MenuItem] {
+        let here = Route.folderRoute(for: path)
+        let more = MenuItem(title: "More", systemImage: "ellipsis.circle", route: .folderMore(path))
+        if selecting {
+            return [
+                MenuItem(title: "Done", systemImage: SelectSymbol.done, route: here, action: .done),
+                MenuItem(
+                    title: "Copy", systemImage: ClipboardSymbol.copy, route: here,
+                    isDisabled: selectedCount == 0, action: .copy),
+                more,
+            ]
+        }
         let holding = clipboardCount > 0
         return [
             MenuItem(title: "Add", systemImage: "plus.capsule", route: .add(path)),
@@ -53,11 +70,12 @@ struct FolderScreen: View {
                 systemImage: holding ? "list.clipboard.fill" : "list.clipboard",
                 route: .clipboard(path), opticalOffset: -1.5,
                 count: holding ? clipboardCount : nil),
-            MenuItem(title: "More", systemImage: "ellipsis.circle", route: .folderMore(path)),
+            more,
         ]
     }
 
     @Environment(Navigation.self) private var navigation
+    @Environment(FileSelection.self) private var selection
 
     @AppStorage(FileSettings.showExtensionsKey) private var showExtensions =
         FileSettings.showExtensionsDefault
@@ -74,28 +92,42 @@ struct FolderScreen: View {
 
     /// `nil` until the first read finishes.
     @State private var contents: FolderContents?
+
     /// Folders' and sessions' totals, filled in as they're worked out.
     @State private var sizes: [FilePath: Int64] = [:]
+
     /// The file open in a viewer.
     @State private var viewing: FilePath?
+
     /// Items being deleted: their rows leave at once, before the bin has them,
     /// and stay gone through the re-reads in between.
     @State private var deleting: Set<FilePath> = []
     @State private var failure: OperationFailure?
+
     /// Counts reads begun, so one that finishes after a newer has begun is
     /// dropped: a delete's re-read may overtake another's.
     @State private var reads = 0
+
     /// How many items the clipboard holds that are still there.
     @State private var clipboardCount = 0
 
     var body: some View {
         ActionList(
-            actions: Self.buttons(for: path, clipboardCount: clipboardCount),
-            perform: { navigation.push($0.route) }
+            actions: Self.buttons(
+                for: path, clipboardCount: clipboardCount, selecting: isSelecting,
+                selectedCount: selection.items.count),
+            perform: perform
         ) {
             rows
         }
         .navigationTitle(title)
+        .onChange(of: isSelecting) { _, selecting in
+            if selecting { listForSelection() }
+        }
+        // Delete Selected, handed back from More.
+        .onChange(of: selection.deletion?.screen, initial: true) {
+            if let paths = selection.takeDeletion(on: route) { delete(paths) }
+        }
         // Re-reads whenever the folder comes back to the top of the path, and when Show Hidden
         // changes. `.task` alone doesn't rerun when a screen pushed over it is popped (watchOS 27).
         .task(id: LoadKey(showHidden: showHidden, isOnTop: isOnTop)) {
@@ -111,12 +143,19 @@ struct FolderScreen: View {
         let isOnTop: Bool
     }
 
+    private var route: Route { Route.folderRoute(for: path) }
+
     /// Whether this folder is the top screen.
     private var isOnTop: Bool {
-        return navigation.path.last == Route.folderRoute(for: path)
+        return navigation.path.last == route
     }
 
+    private var isSelecting: Bool { selection.isSelecting(on: route) }
+
     private var title: Text {
+        if isSelecting {
+            return Text(verbatim: FileSelection.title(selected: selection.items.count))
+        }
         guard let name = path.name else { return Text("Files") }
         return Text(verbatim: FolderScreen.displayName(of: name, showExtensions: showExtensions))
     }
@@ -148,9 +187,11 @@ struct FolderScreen: View {
                     ForEach(section.items) { item in
                         FileRow(
                             item: item, size: item.isDirectory ? sizes[item.path] : item.size,
-                            style: style, open: { open(item) },
-                            more: { navigation.push(.itemMore(item.path)) },
-                            delete: { delete(item) }, copy: { copy(item) })
+                            style: style,
+                            isSelected: isSelecting ? selection.items.contains(item.path) : nil,
+                            open: { open(item) }, more: { navigation.push(.itemMore(item.path)) },
+                            delete: { delete([item.path]) }, copy: { copy(item) },
+                            select: { selection.begin(on: route, with: item.path) })
                     }
                 } header: {
                     if let group = section.group {
@@ -176,9 +217,21 @@ struct FolderScreen: View {
             .listRowBackground(Color.clear)
     }
 
+    private func perform(_ button: MenuItem) {
+        switch button.action {
+        case .done: selection.end()
+        case .copy: copySelected()
+        case .select, nil: navigation.push(button.route)
+        }
+    }
+
     private func open(_ item: FileItem) {
         // The tap ending a long press arrives once More is on top; it isn't an open.
         guard isOnTop else { return }
+        if isSelecting {
+            selection.toggle(item.path)
+            return
+        }
         switch item.kind {
         case .folder: navigation.push(.folder(item.path))
         case .session: navigation.push(.session(item.path))
@@ -186,18 +239,45 @@ struct FolderScreen: View {
         }
     }
 
-    /// Deleting never asks. A failure brings the row back with that read.
-    private func delete(_ item: FileItem) {
-        deleting.insert(item.path)
+    /// Deleting never asks. A failure brings the rows back with that read.
+    private func delete(_ paths: [FilePath]) {
+        guard !paths.isEmpty else { return }
+        deleting.formUnion(paths)
         Task {
             do {
-                _ = try await FilesRoot.operations.delete([item.path])
+                _ = try await FilesRoot.operations.delete(paths)
             } catch {
                 failure = OperationFailure("Couldn't Delete", error)
             }
             await load()
-            deleting.remove(item.path)
+            deleting.subtract(paths)
         }
+    }
+
+    /// Puts the selection on the clipboard and leaves select mode.
+    private func copySelected() {
+        let paths = selection.selected
+        guard !paths.isEmpty else { return }
+        selection.end()
+        Task {
+            do {
+                try await FileOperations.copyWithTap(paths)
+            } catch {
+                failure = OperationFailure("Couldn't Copy", error)
+            }
+            await load()
+        }
+    }
+
+    /// Tells the selection what the folder lists, so items that have gone leave
+    /// it, all of them when the folder is gone or can't be read.
+    private func listForSelection() {
+        guard isSelecting, let contents else { return }
+        guard case .items(let items, _) = contents else {
+            selection.list([])
+            return
+        }
+        selection.list(items.map(\.path).filter { !deleting.contains($0) })
     }
 
     /// Puts the item on the clipboard, then reads the folder again for the
@@ -234,6 +314,7 @@ struct FolderScreen: View {
         guard !Task.isCancelled, read == reads else { return }
         contents = loaded
         clipboardCount = held
+        listForSelection()
         guard case .items(let items, _) = loaded else { return }
 
         // Handed over in batches, as each change re-sorts the folder.

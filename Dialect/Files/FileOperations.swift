@@ -227,16 +227,22 @@ actor FileOperations {
         return restored
     }
 
-    /// Restores everything, newest deletion first, which undoes the deletes in
-    /// reverse: after `a/b/f` and then `a` were deleted, `a` comes back first
-    /// and `f` goes back into it. Stops at the first item that can't be
-    /// restored.
+    /// Restores everything, as one step.
     func restoreAll(timeZone: TimeZone = .current) async throws -> [Restored] {
+        return try await restore(bin.items(), timeZone: timeZone)
+    }
+
+    /// Restores the items as one step, newest deletion first, which undoes the
+    /// deletes in reverse: after `a/b/f` and then `a` were deleted, `a` comes
+    /// back first and `f` goes back into it. Stops at the first item that can't
+    /// be restored.
+    func restore(_ items: [BinItem], timeZone: TimeZone = .current) async throws -> [Restored] {
         var restored: [Restored] = []
         let bin = self.bin
         bin.tidy()
         pruneClipboard()
-        for item in bin.items() {
+        let newestFirst = items.sorted { $0.deleted > $1.deleted }
+        for item in newestFirst {
             do {
                 restored.append(try moveOutOfBin(item, timeZone: timeZone))
             } catch {

@@ -138,13 +138,27 @@ struct MenuItem: Identifiable {
     /// holds; `nil` shows none.
     var count: Int?
 
+    /// What a button does on its own screen, such as Done; its `route` is that
+    /// screen's. `nil` for a button that opens `route`.
+    var action: MenuAction?
+
     /// The count, as VoiceOver reads it.
     var countDescription: String? {
         guard let count else { return nil }
         return count == 1 ? String(localized: "1 item") : String(localized: "\(count) items")
     }
 
-    var id: Route { route }
+    struct ID: Hashable {
+        let route: Route
+        let action: MenuAction?
+    }
+
+    var id: ID { ID(route: route, action: action) }
+}
+
+/// An action a button performs on the screen showing it.
+enum MenuAction: Hashable {
+    case select, done, copy
 }
 
 #if DEBUG

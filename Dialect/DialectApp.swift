@@ -3,6 +3,8 @@ import SwiftUI
 @main
 struct DialectApp: App {
     @State private var navigation = Navigation(path: Self.initialPath)
+    @State private var fileSelection = FileSelection()
+    @State private var binSelection = BinSelection()
     @State private var router = LaunchRouter.shared
     @AppStorage(AccentSetting.key) private var accent = RGBColor.dialectGreen.displayP3
 
@@ -40,10 +42,12 @@ struct DialectApp: App {
             }
         #endif
 
-        // Whatever was being made when Dialect last stopped is abandoned.
+        // Whatever was being made or shared when Dialect last stopped is abandoned.
         let operations = FilesRoot.operations
+        let stores = FilesStores.url
         let emptyTrashAfter = FileSettings.emptyTrashAfter()
-        Task(priority: .background) {
+        Task.detached(priority: .background) {
+            Sharing.clear(in: stores)
             await operations.clearStaging()
             await operations.removeExpired(after: emptyTrashAfter)
         }
@@ -59,6 +63,12 @@ struct DialectApp: App {
             }
             .environment(\.dialectAccent, Color(AccentSetting.color(from: accent)))
             .environment(navigation)
+            .environment(fileSelection)
+            .environment(binSelection)
+            .onChange(of: navigation.path) { _, path in
+                fileSelection.follow(path)
+                binSelection.follow(path)
+            }
             .onOpenURL { router.open($0) }
             .onChange(of: router.pending, initial: true) { followLaunch() }
         }

@@ -281,6 +281,43 @@ struct BinOperationsTests {
         #expect(setup.bin.items().map(\.name) == ["a.txt"])
     }
 
+    /// Restore Selected restores the items given, newest deletion first
+    /// whatever order they're given in, as one step, and leaves the rest.
+    @Test func restoresSeveral() async throws {
+        let setup = try OperationsSetup()
+        try setup.root.file("a/b/f.txt", text: "f")
+        try setup.root.file("kept.txt")
+        let f = try #require(
+            try await setup.operations.delete([FilePath("a/b/f.txt")], now: noon).first)
+        let a = try #require(
+            try await setup.operations.delete([FilePath("a")], now: noon + 1).first)
+        _ = try await setup.operations.delete([FilePath("kept.txt")], now: noon + 2)
+
+        let restored = try await setup.operations.restore([f, a]).map(\.path)
+        #expect(restored == [FilePath("a"), FilePath("a/b/f.txt")])
+        #expect(try setup.text("a/b/f.txt") == "f")
+        #expect(setup.bin.items().map(\.name) == ["kept.txt"])
+        #expect(setup.history.read().undo.map(\.kind) == [.delete, .delete, .delete, .restore])
+    }
+
+    /// Restore Selected stops at the first failure, as Restore All does.
+    @Test func restoreSeveralStopsPartWay() async throws {
+        let setup = try OperationsSetup()
+        try setup.root.file("a.txt")
+        try setup.root.file("b.txt")
+        let a = try #require(
+            try await setup.operations.delete([FilePath("a.txt")], now: noon).first)
+        let b = try #require(
+            try await setup.operations.delete([FilePath("b.txt")], now: noon + 1).first)
+        try await setup.operations.deletePermanently([a])
+        await #expect {
+            try await setup.operations.restore([a, b])
+        } throws: { error in
+            (error as? PartialFailure<Restored>)?.done.map(\.path) == [FilePath("b.txt")]
+        }
+        #expect(setup.history.read().undo.last?.changes.count == 1)
+    }
+
     @Test func failsToRestoreWhatsGoneFromTheBin() async throws {
         let setup = try OperationsSetup()
         try setup.root.file("a.txt")

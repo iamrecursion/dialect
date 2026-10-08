@@ -101,6 +101,39 @@ final class BinUITests: FilesUITestCase {
         XCTAssertTrue(text(containing: "The Trash is empty").waitForExistence(timeout: 5))
     }
 
+    /// Select mode: a tap selects instead of opening Info; More restores the
+    /// selection, then deletes another for good once confirmed.
+    @MainActor
+    func testRestoresAndDeletesTheSelection() {
+        openTrash()
+        app.buttons["Select"].tap()
+        waitForTitle("Select Items")
+        open("old-notes.md")
+        open("draft.scm")
+        waitForTitle("2 Selected")
+        XCTAssertTrue(row("draft.scm").isSelected)
+        app.buttons["More"].tap()
+        waitForTitle("More")
+        app.buttons["Restore Selected"].tap()
+        waitForTitle("Trash")
+        waitUntilGone(app.buttons["old-notes.md"])
+        assertNoRow("draft.scm")
+        XCTAssertTrue(row("draft 2.scm").exists)
+
+        app.buttons["Select"].tap()
+        open("sketch.scm")
+        waitForTitle("1 Selected")
+        app.buttons["More"].tap()
+        waitForTitle("More")
+        app.buttons["Delete Selected"].tap()
+        XCTAssertTrue(
+            text(containing: "Delete 1 item permanently?").waitForExistence(timeout: 5))
+        app.tables.buttons["Delete Selected"].tap()
+        waitForTitle("Trash")
+        waitUntilGone(app.buttons["sketch.scm"])
+        XCTAssertTrue(app.buttons["Select"].exists)
+    }
+
     /// Delete All empties the bin, and the folder's More then grays out Trash.
     @MainActor
     func testDeletesAll() {
