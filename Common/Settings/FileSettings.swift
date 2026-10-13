@@ -37,10 +37,6 @@ enum FileSettings {
     static let undoHistoryDefault = 20
     static let undoHistoryChoices = [20, 50, 100]
 
-    /// The extensions used to make files, most recent first, without dots;
-    /// empty for None.
-    static let recentExtensionsKey = "files.recentExtensions"
-
     static let dateStyleKey = "appearance.dates"
     static let dateStyleDefault = DateStyle.system
 
@@ -66,22 +62,7 @@ enum FileSettings {
     static func normalizedExtension(_ typed: String) -> String {
         var ext = typed.trimmingCharacters(in: .whitespaces).lowercased()
         if ext.hasPrefix(".") { ext.removeFirst() }
-        return ext
-    }
-
-    /// Why Text Extensions can't add `typed`, or `nil` if it can.
-    static func textExtensionProblem(_ typed: String, existing: [String])
-        -> TextExtensionProblem?
-    {
-        let ext = normalizedExtension(typed)
-        if ext.isEmpty { return .empty }
-        if ext.contains("/") { return .slash }
-        if ext.contains(".") { return .dot }
-        if textExtensions(from: existing).contains(ext) { return .listed(ext) }
-        if let kind = FileKind.classify(name: "x.\(ext)", isDirectory: false, textExtensions: []) {
-            return .known(ext, kind)
-        }
-        return nil
+        return ext.trimmingCharacters(in: .whitespaces)
     }
 
     /// Days an item stays in the bin, or `nil` for Never.
@@ -113,52 +94,15 @@ enum FileSettings {
                 localized: "The oldest \(steps) steps will be dropped and can't then be undone.")
     }
 
-    static func recentExtensions(in defaults: UserDefaults = .standard) -> [String] {
-        return defaults.stringArray(forKey: recentExtensionsKey) ?? []
-    }
-
-    /// Notes that a file was made with `ext`, which Add › File then offers
-    /// first.
-    static func recordExtension(_ ext: String, in defaults: UserDefaults = .standard) {
-        let listed = NameRules.listedExtensions(
-            textExtensions: defaults.stringArray(forKey: textExtensionsKey) ?? [])
-        defaults.set(
-            NameRules.recording(ext, in: recentExtensions(in: defaults), listed: listed),
-            forKey: recentExtensionsKey)
+    /// Text Extensions' list as stored, without blanks.
+    static func storedTextExtensions(in defaults: UserDefaults = .standard) -> [String] {
+        let typed = defaults.stringArray(forKey: textExtensionsKey) ?? []
+        return typed.filter { !normalizedExtension($0).isEmpty }
     }
 
     /// The user's text extensions, as stored.
     static func textExtensions(in defaults: UserDefaults = .standard) -> Set<String> {
         return textExtensions(from: defaults.stringArray(forKey: textExtensionsKey) ?? [])
-    }
-}
-
-/// Why Text Extensions refuses an extension, shown beneath its field.
-enum TextExtensionProblem: Equatable, Sendable {
-    case empty
-    case slash
-
-    /// An extension is the part after the last dot, so it can't hold one.
-    case dot
-    case listed(String)
-
-    /// Files already gives files with it a kind.
-    case known(String, FileKind)
-
-    var reason: String {
-        switch self {
-        case .empty: return String(localized: "An extension can't be empty.")
-        case .slash: return String(localized: "An extension can't contain “/”.")
-        case .dot: return String(localized: "An extension can't contain a dot.")
-        case .listed(let ext): return String(localized: ".\(ext) is already in the list.")
-        case .known(let ext, let kind):
-            switch kind {
-            case .scheme: return String(localized: "Files already treats .\(ext) as Scheme source.")
-            case .image: return String(localized: "Files already treats .\(ext) as an image.")
-            case .video: return String(localized: "Files already treats .\(ext) as a video.")
-            default: return String(localized: "Files already treats .\(ext) as text.")
-            }
-        }
     }
 }
 

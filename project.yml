@@ -50,6 +50,8 @@ targets:
         buildPhase: resources
       # Code the widget extension shares, such as the launch links its complications open.
       - path: Shared
+      # Code all three targets share, such as the settings' keys and the strings catalog.
+      - path: Common
     # The `dialect://` links that complications open and `simctl openurl` can test. XcodeGen writes
     # this file on every `make project` (gitignored); Xcode merges the generated keys into it.
     info:
@@ -89,13 +91,14 @@ targets:
         CODE_SIGN_STYLE: Automatic
 
   # The watch app's complications: a WidgetKit extension. It shares `Shared/` with the app, such as
-  # the launch links its complications open.
+  # the launch links its complications open, and `Common/` with both apps.
   DialectWidgets:
     type: app-extension
     platform: watchOS
     sources:
       - path: DialectWidgets
       - path: Shared
+      - path: Common
     info:
       path: Generated/DialectWidgets-Info.plist
       properties:
@@ -144,10 +147,20 @@ targets:
     platform: iOS
     sources:
       - path: DialectCompanion
+      - path: Common
       - path: assets/Dialect.icon
+      # Credits, as on the watch.
+      - path: NOTICE-dialect.md
+        buildPhase: resources
+      - path: LICENSE
+        buildPhase: resources
     dependencies:
       - target: Dialect
         embed: true
+    # `xcodebuild test -scheme DialectCompanion` runs its UI tests.
+    scheme:
+      testTargets:
+        - DialectCompanionUITests
     settings:
       base:
         # The watch app's ID is prefixed by this one; see the watch target above.
@@ -157,4 +170,21 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Dialect
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        # iPhone only: an iPad can't pair with a watch.
+        TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
+
+  # The companion's UI tests, against a fake watch (`-fakeWatch`). Its logic is in `Common/`, unit
+  # tested in DialectTests. Run them with `make companion-test`.
+  DialectCompanionUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: DialectCompanionUITests
+    dependencies:
+      - target: DialectCompanion
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: DialectCompanion

@@ -8,17 +8,17 @@ enum FileKind: Sendable, CaseIterable {
     /// A directory named `name.dial`, shown as one item.
     case session
 
-    /// Scheme source: a file with one of `schemeExtensions`.
+    /// Scheme source: a file with one of `KnownExtensions.scheme`.
     case scheme
 
-    /// A text document: a file with one of `textExtensions`, or one of the
-    /// user's Settings › Files › Text Extensions.
+    /// A text document: a file with one of `KnownExtensions.text`, or one of
+    /// the user's Settings › Files › Text Extensions.
     case text
 
-    /// An image: a file with one of `imageExtensions`.
+    /// An image: a file with one of `KnownExtensions.image`.
     case image
 
-    /// A video: a file with one of `videoExtensions`.
+    /// A video: a file with one of `KnownExtensions.video`.
     case video
 
     /// A file of no known kind that reads as UTF-8 text.
@@ -28,21 +28,6 @@ enum FileKind: Sendable, CaseIterable {
     /// isn't a regular file or a directory, such as a named pipe, or a broken
     /// link.
     case binary
-
-    /// The extensions of Scheme source, lowercase and without the dot, as all
-    /// these sets are: `.scm` for programs and `.sld` for R7RS libraries.
-    static let schemeExtensions: Set = ["scm", "sld"]
-
-    /// The extensions of text documents, without the user's.
-    static let textExtensions: Set = ["md", "txt", "toml", "yaml", "json", "xml", "csv"]
-
-    /// The extensions of images.
-    static let imageExtensions: Set = [
-        "jpg", "jpeg", "png", "gif", "heic", "heif", "tif", "tiff", "jxl",
-    ]
-
-    /// The extensions of videos.
-    static let videoExtensions: Set = ["mp4", "mov", "m4v"]
 
     /// How many bytes the text-like check reads from the start of a file.
     static let sniffLength = 4096
@@ -58,11 +43,16 @@ enum FileKind: Sendable, CaseIterable {
         if isDirectory {
             return ext == "dial" ? .session : .folder
         }
-        if schemeExtensions.contains(ext) { return .scheme }
-        if self.textExtensions.contains(ext) || textExtensions.contains(ext) { return .text }
-        if imageExtensions.contains(ext) { return .image }
-        if videoExtensions.contains(ext) { return .video }
-        return nil
+        // Scheme source first; then text, the user's extensions included, ahead of images and
+        // videos.
+        let known = KnownExtensions.kind(of: ext)
+        if known == .scheme { return .scheme }
+        if known == .text || textExtensions.contains(ext) { return .text }
+        switch known {
+        case .image: return .image
+        case .video: return .video
+        default: return nil
+        }
     }
 
     /// `.otherText` when the file's first 4 KB are valid UTF-8 with no NUL

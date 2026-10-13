@@ -217,12 +217,3 @@ private struct RecentRow: View {
         .accessibilityAction(named: Text(isPinned ? "Unpin" : "Pin"), pin)
     }
 }
-
-/// Recents' icons.
-enum RecentsSymbol {
-    static let recents = "clock.arrow.trianglehead.counterclockwise.rotate.90"
-    static let showInFiles = "folder"
-    static let hide = "eye.slash"
-    static let pin = "pin"
-    static let unpin = "pin.slash"
-}

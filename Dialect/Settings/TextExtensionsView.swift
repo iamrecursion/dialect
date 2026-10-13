@@ -7,12 +7,6 @@ struct TextExtensionsView: View {
     @State private var typed = ""
     @State private var problem: TextExtensionProblem?
 
-    /// The list as stored, without blanks.
-    static func stored(in defaults: UserDefaults = .standard) -> [String] {
-        let typed = defaults.stringArray(forKey: FileSettings.textExtensionsKey) ?? []
-        return typed.filter { !FileSettings.normalizedExtension($0).isEmpty }
-    }
-
     var body: some View {
         List {
             Section {
@@ -38,7 +32,13 @@ struct TextExtensionsView: View {
             }
         }
         .navigationTitle("Text Extensions")
-        .onAppear { extensions = Self.stored() }
+        .onAppear { extensions = FileSettings.storedTextExtensions() }
+        // The phone can change the list while it's shown.
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) {
+            _ in
+            let stored = FileSettings.storedTextExtensions()
+            if stored != extensions { extensions = stored }
+        }
     }
 
     /// Adds what was typed, or says why it can't.

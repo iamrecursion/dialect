@@ -17,7 +17,8 @@ struct Recents: Sendable {
 
     /// What it holds, gone or not.
     struct Held: Equatable, Sendable {
-        /// Newest first, pinned ones included, so pins keep their own order.
+        /// Newest first, pinned ones included, so pins are listed newest first
+        /// too.
         var paths: [FilePath] = []
         var pinned: [FilePath] = []
 
@@ -118,18 +119,6 @@ enum RecentsError: LocalizedError, Equatable {
         case .tooManyPins:
             return String(localized: "Only 3 items can be pinned. Unpin one to pin this.")
         }
-    }
-}
-
-/// Settings › History.
-enum RecentsSettings {
-    static let showLastKey = "recents.showLast"
-    static let showLastDefault = 5
-    static let showLastChoices = [3, 5, 10, 20]
-
-    static func showLast(in defaults: UserDefaults = .standard) -> Int {
-        let count = defaults.integer(forKey: showLastKey)
-        return count > 0 ? count : showLastDefault
     }
 }
 

@@ -276,6 +276,27 @@ struct HSB: Hashable, Sendable {
     var brightness: Double
 }
 
+// Core Graphics, for the system color picker.
+extension RGBColor {
+    /// A color from any color space, clamped to Display P3; `nil` if it can't
+    /// be converted.
+    init?(cgColor: CGColor) {
+        guard let space = CGColorSpace(name: CGColorSpace.displayP3),
+            let converted = cgColor.converted(to: space, intent: .defaultIntent, options: nil),
+            let components = converted.components, components.count >= 3
+        else { return nil }
+        self.init(
+            red: Double(components[0]), green: Double(components[1]),
+            blue: Double(components[2]))
+    }
+
+    var cgColor: CGColor {
+        return CGColor(
+            colorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
+            components: [red, green, blue, 1].map { CGFloat($0) })!
+    }
+}
+
 extension Color {
     init(_ color: RGBColor) {
         self.init(.displayP3, red: color.red, green: color.green, blue: color.blue)

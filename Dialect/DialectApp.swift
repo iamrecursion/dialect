@@ -7,6 +7,7 @@ struct DialectApp: App {
     @State private var binSelection = BinSelection()
     @State private var router = LaunchRouter.shared
     @AppStorage(AccentSetting.key) private var accent = RGBColor.dialectGreen.displayP3
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         #if DEBUG
@@ -42,6 +43,8 @@ struct DialectApp: App {
             }
         #endif
 
+        WatchLink.shared.start()
+
         // Whatever was being made or shared when Dialect last stopped is abandoned.
         let operations = FilesRoot.operations
         let stores = FilesStores.url
@@ -70,7 +73,15 @@ struct DialectApp: App {
                 binSelection.follow(path)
             }
             .onOpenURL { router.open($0) }
+            // Sends what changes without a settings change, such as the undo history's length.
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background { WatchLink.shared.publish() }
+            }
             .onChange(of: router.pending, initial: true) { followLaunch() }
+        }
+        // The phone's edits, delivered while Dialect isn't open.
+        .backgroundTask(.watchConnectivity) {
+            await WatchLink.shared.waitForDelivery()
         }
     }
 

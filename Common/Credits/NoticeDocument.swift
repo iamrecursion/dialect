@@ -85,8 +85,8 @@ extension NoticeDocument {
 
     /// Lines of a license text, reflowed for a narrow screen: the lines of each
     /// paragraph (blank-line separated) are joined with spaces, except that a
-    /// line starting with "Copyright" stays on its own line. Indentation is
-    /// dropped but every word is kept.
+    /// line starting with "Copyright" stays separate. Indentation is dropped
+    /// but every word is kept.
     static func reflow(_ lines: [String]) -> [String] {
         var paragraphs: [String] = []
         var current = ""
@@ -225,7 +225,7 @@ extension NoticeDocument {
     }
 
     /// The notice's sections, then the Apache License 2.0 (`LICENSE`, reflowed)
-    /// as a page of its own. `nil` if a file is missing or the notice has no
+    /// as a separate page. `nil` if a file is missing or the notice has no
     /// sections.
     static func creditsPages(notice: String?, license: String?) -> [NoticeSection]? {
         guard let notice, let license else { return nil }

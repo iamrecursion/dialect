@@ -64,6 +64,7 @@ struct FileSettingsTests {
     @Test func storesAnExtensionPlainly() {
         #expect(FileSettings.normalizedExtension(".RKT") == "rkt")
         #expect(FileSettings.normalizedExtension("  el ") == "el")
+        #expect(FileSettings.normalizedExtension(". el") == "el")
         #expect(problem(".RKT") == nil)
     }
 

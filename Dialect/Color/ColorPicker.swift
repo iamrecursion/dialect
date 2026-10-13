@@ -7,8 +7,8 @@ import SwiftUI
 /// While on screen, the sliders keep their hue, saturation and brightness, and
 /// the color follows them. Deriving them from the color each time would make
 /// them jitter (each component is rounded) and lose a gray's hue. A swatch, a
-/// hex value or a reset sets the color, and the sliders are derived from it
-/// once.
+/// hex value, a reset or a change from elsewhere sets the color, and the
+/// sliders are derived from it once.
 struct ColorPicker<Preview: View>: View {
     @Binding var color: RGBColor
 
@@ -92,7 +92,13 @@ struct ColorPicker<Preview: View>: View {
             sliders = sliders ?? color.hsb(fallbackHue: 0)
             hexText = color.hex
         }
-        .onChange(of: color) { hexText = color.hex }
+        .onChange(of: color) {
+            hexText = color.hex
+            // The sliders follow a color they didn't make, such as one from the phone.
+            if let sliders, RGBColor(sliders) != color {
+                self.sliders = color.hsb(fallbackHue: sliders.hue)
+            }
+        }
     }
 
     /// Beside a hex value that is only the nearest to the color; brings up the

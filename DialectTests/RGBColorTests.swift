@@ -190,4 +190,20 @@ struct RGBColorTests {
         let gray = RGBColor(sRGBRed: 0x76, green: 0x76, blue: 0x76)
         #expect(abs(gray.contrast(with: white) - 4.54) < 0.01)
     }
+
+    /// The system color picker's colors, in whatever space, are taken in
+    /// Display P3.
+    @Test func convertsACGColorToDisplayP3() throws {
+        let space = try #require(CGColorSpace(name: CGColorSpace.displayP3))
+        let p3 = try #require(CGColor(colorSpace: space, components: [0.57, 0.78, 0.5, 1]))
+        #expect(RGBColor(cgColor: p3) == .dialectGreen)
+        #expect(RGBColor(cgColor: RGBColor.dialectGreen.cgColor) == .dialectGreen)
+
+        let blue = try #require(
+            RGBColor(cgColor: CGColor(srgbRed: 0x0A / 255, green: 0x84 / 255, blue: 1, alpha: 1)))
+        let expected = RGBColor(sRGBRed: 0x0A, green: 0x84, blue: 0xFF)
+        #expect(abs(blue.red - expected.red) < 0.001)
+        #expect(abs(blue.green - expected.green) < 0.001)
+        #expect(abs(blue.blue - expected.blue) < 0.001)
+    }
 }

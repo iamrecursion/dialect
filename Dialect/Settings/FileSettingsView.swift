@@ -73,7 +73,12 @@ struct FileSettingsView: View {
         } message: { shortening in
             Text(FileSettings.shorteningNote(dropping: shortening.dropping))
         }
-        .onAppear { textExtensionCount = TextExtensionsView.stored().count }
+        .onAppear { textExtensionCount = FileSettings.storedTextExtensions().count }
+        // The phone can change the list while it's shown.
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) {
+            _ in
+            textExtensionCount = FileSettings.storedTextExtensions().count
+        }
     }
 
     /// Sets Undo History, first asking when a shorter one would drop steps.

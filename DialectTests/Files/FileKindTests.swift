@@ -46,6 +46,14 @@ struct FileKindTests {
         #expect(kind("init.el") == nil)
     }
 
+    /// Text Extensions refuses a known extension. One in the list anyway makes
+    /// text of an image or a video; Scheme source stays Scheme source.
+    @Test func ranksTheUsersTextExtensions() {
+        #expect(kind("a.png", text: ["png"]) == .text)
+        #expect(kind("a.mov", text: ["mov"]) == .text)
+        #expect(kind("a.scm", text: ["scm"]) == .scheme)
+    }
+
     @Test func sniffsText() throws {
         let root = try TemporaryRoot()
         #expect(FileKind.sniff(try root.file("readme", text: "Hello, λ!\n")) == .otherText)
