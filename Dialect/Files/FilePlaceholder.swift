@@ -9,6 +9,7 @@ import SwiftUI
 struct FilePlaceholder: View {
     let path: FilePath
 
+    @Environment(\.fileOperations) private var operations
     @State private var info: LoadedInfo?
     @State private var loaded = false
 
@@ -36,7 +37,7 @@ struct FilePlaceholder: View {
             .navigationDestination(for: Route.self) { $0.destination }
         }
         .task {
-            await LoadedInfo.load(path, countsItems: false) {
+            await LoadedInfo.load(path, root: operations.root, countsItems: false) {
                 info = $0
                 loaded = true
             }
@@ -53,6 +54,6 @@ struct SessionPlaceholder: View {
 
     var body: some View {
         Placeholder(
-            verbatim: FolderScreen.displayName(of: path.name ?? "", showExtensions: showExtensions))
+            verbatim: FileItem.displayName(of: path.name ?? "", showExtensions: showExtensions))
     }
 }

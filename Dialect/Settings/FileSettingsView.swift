@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Settings › Files.
 struct FileSettingsView: View {
+    @Environment(\.fileOperations) private var operations
     @AppStorage(FileSettings.confirmExtensionChangesKey) private var confirmExtensionChanges =
         FileSettings.confirmExtensionChangesDefault
     @AppStorage(FileSettings.emptyTrashAfterKey) private var emptyTrashAfter =
@@ -83,7 +84,7 @@ struct FileSettingsView: View {
 
     /// Sets Undo History, first asking when a shorter one would drop steps.
     private func choose(_ steps: Int) {
-        let dropping = FilesRoot.operations.history.read().excess(over: steps)
+        let dropping = operations.history.read().excess(over: steps)
         if dropping > 0 {
             shortening = (steps, dropping)
         } else {
@@ -93,7 +94,7 @@ struct FileSettingsView: View {
 
     private func shorten(to steps: Int) {
         Task {
-            try? await FilesRoot.operations.trimHistory(to: steps)
+            try? await operations.trimHistory(to: steps)
             undoHistory = steps
         }
     }
@@ -103,4 +104,5 @@ struct FileSettingsView: View {
     NavigationStack {
         FileSettingsView()
     }
+    .fileOperations(FileOperations(root: .documentsDirectory, stores: FilesStores.standard))
 }

@@ -40,9 +40,11 @@ extension FileOperations {
     func clashes(_ kind: Transfer.Kind, into folder: FilePath) throws -> [Clash] {
         let sources = clipboard.paths().filter(exists)
         if kind == .move { try refuseIntoItself(sources, folder) }
-        let taken = try contents(of: folder)
+        let taken = try takenNames(in: folder)
         return sources.compactMap { source in
+            // An item named like the inbox goes in numbered: it can't be replaced.
             guard let name = source.name, source.parent != folder,
+                !NameRules.isInbox(name, in: folder),
                 let existing = taken.first(where: { NameRules.sameName($0, name) })
             else { return nil }
             return Clash(
@@ -69,7 +71,7 @@ extension FileOperations {
         pruneHeld()
         let sources = clipboard.paths()
         if kind == .move { try refuseIntoItself(sources, folder) }
-        _ = try contents(of: folder)
+        _ = try takenNames(in: folder)
         var done: [Transfer] = []
         // What Replace sent to the bin, which may hold later sources: the incoming item now has its
         // path, so it can't be told by the path alone.
@@ -97,7 +99,7 @@ extension FileOperations {
     ) throws -> Transfer {
         guard let name = source.name else { preconditionFailure("Files' root can't be copied") }
         let isDirectory = Self.kind(at: source.url(in: root)).map { $0 != .file } ?? false
-        let taken = try contents(of: folder)
+        let taken = try takenNames(in: folder)
         var target = name
         var replacing: FilePath?
         if source.parent == folder {

@@ -43,6 +43,18 @@ struct FileListingTests {
         return items.map(\.name).sorted()
     }
 
+    /// The inbox stays out of the root's listing, even with hidden items shown;
+    /// a folder of that name anywhere else is listed.
+    @Test func leavesOutTheInboxAtTheRoot() throws {
+        let root = try TemporaryRoot()
+        try root.file("Inbox/com.apple.watchconnectivity/ApplicationContext")
+        try root.file("notes/Inbox/a.txt")
+        try root.file("com.apple.watchconnectivity/b.txt")
+        #expect(names(try list(root)) == ["com.apple.watchconnectivity", "notes"])
+        #expect(names(try list(root, hidden: true)) == ["com.apple.watchconnectivity", "notes"])
+        #expect(names(try list(root, FilePath("notes"))) == ["Inbox"])
+    }
+
     @Test func listsAFolder() throws {
         let root = try TemporaryRoot()
         try root.file("scripts/prelude.scm", text: "(define x 1)")

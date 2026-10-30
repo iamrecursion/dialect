@@ -37,7 +37,8 @@ enum NameProblem: Equatable, Sendable {
     case empty
     case slash
 
-    /// `.` and `..`, which name a folder and its parent.
+    /// `.` and `..`, which name a folder and its parent, or the inbox's name at
+    /// the root.
     case reserved
 
     /// Over APFS's 255 bytes of UTF-8.
@@ -120,6 +121,11 @@ enum NameRules {
         return a.compare(b, options: .caseInsensitive) == .orderedSame
     }
 
+    /// Whether `name` in `folder` would be the inbox, as APFS compares names.
+    static func isInbox(_ name: String, in folder: FilePath) -> Bool {
+        return folder == .root && sameName(name, FilePath.inboxName)
+    }
+
     /// Why `full` can't be used, or `nil` if it can.
     ///
     /// - Parameters:
@@ -129,12 +135,14 @@ enum NameRules {
     ///   - taken: every name in the folder, hidden ones included.
     ///   - current: the item's name when renaming, which doesn't count as
     ///     taken.
+    ///   - folder: the folder it would be in.
     static func problem(
-        typed: String, full: String, kind: NewItemKind, taken: [String], current: String? = nil
+        typed: String, full: String, kind: NewItemKind, taken: [String], current: String? = nil,
+        in folder: FilePath
     ) -> NameProblem? {
         if typed.isEmpty { return .empty }
         if full.contains("/") { return .slash }
-        if full == "." || full == ".." { return .reserved }
+        if full == "." || full == ".." || isInbox(full, in: folder) { return .reserved }
         if full.utf8.count > maximumLength { return .tooLong }
         if kind == .folder && FileItem.splitName(full).ext.lowercased() == "dial" {
             return .folderEndsInDial

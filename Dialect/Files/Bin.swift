@@ -16,20 +16,14 @@ struct BinItem: Identifiable, Hashable, Sendable {
     /// The item, inside the bin.
     let url: URL
 
-    private static let day: TimeInterval = 24 * 60 * 60
-
-    /// Whole days until the bin empties itself of this item, rounded up so the
-    /// last day is 1.
+    /// Whole days until the bin empties itself of this item.
     func daysLeft(now: Date, after days: Int?) -> Int? {
-        guard let days else { return nil }
-        let left = deleted.addingTimeInterval(Double(days) * Self.day).timeIntervalSince(now)
-        return max(0, Int((left / Self.day).rounded(.up)))
+        return BinExpiry.daysLeft(deleted: deleted, now: now, after: days)
     }
 
     /// Whether it's been in the bin `days` or more.
     func isExpired(now: Date, after days: Int?) -> Bool {
-        guard let days else { return false }
-        return now >= deleted.addingTimeInterval(Double(days) * Self.day)
+        return BinExpiry.isExpired(deleted: deleted, now: now, after: days)
     }
 }
 

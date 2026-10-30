@@ -82,13 +82,14 @@ struct Recents: Sendable {
     /// The pins still there, newest first, then the first `limit` other items
     /// still there. Other hidden items, and anything else in a hidden folder,
     /// are left out unless `showHidden`; a pin is always listed, so every pin
-    /// counting toward the limit can be seen.
+    /// counting toward the limit can be seen. The inbox and anything in it are
+    /// left out, even pinned.
     func listing(root: URL, textExtensions: Set<String>, showHidden: Bool, limit: Int)
         -> Listing
     {
         let held = self.held()
         var listing = Listing()
-        for path in held.paths {
+        for path in held.paths where !path.isWithin(.inbox) {
             let isPinned = held.pinned.contains(path)
             guard isPinned || listing.recent.count < limit,
                 isPinned || showHidden || !Self.isHidden(path),
@@ -122,15 +123,14 @@ enum RecentsError: LocalizedError, Equatable {
     }
 }
 
-extension FilesRoot {
-    /// Notes that the item was opened, for Recents.
-    static func opened(_ path: FilePath) {
-        let operations = self.operations
-        Task { await operations.recordOpen(path) }
-    }
-}
-
 extension FileOperations {
+    /// Notes that the item was opened, for Recents. Its task starts on the main
+    /// actor, so opens are recorded in order.
+    @MainActor
+    func opened(_ path: FilePath) {
+        Task { await recordOpen(path) }
+    }
+
     /// Recents in `stores`.
     nonisolated var recents: Recents { Recents(url: FilesStores.recents(in: stores)) }
 

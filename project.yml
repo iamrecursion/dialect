@@ -61,6 +61,15 @@ targets:
           - CFBundleURLName: com.iamrecursion.dialect.watch
             CFBundleURLSchemes:
               - dialect
+    # The container the companion uploads large transfers to, for the watch to download in the
+    # background.
+    entitlements:
+      path: Dialect/Dialect.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.iamrecursion.dialect
+        com.apple.developer.icloud-services:
+          - CloudKit
     # The complications, embedded in the app, which the iOS companion embeds in turn.
     dependencies:
       - target: DialectWidgets
@@ -98,7 +107,12 @@ targets:
     sources:
       - path: DialectWidgets
       - path: Shared
+      # All but what only the apps' Files use.
       - path: Common
+        excludes:
+          - Files
+          - Link/Files
+          - Assets.xcassets
     info:
       path: Generated/DialectWidgets-Info.plist
       properties:
@@ -154,12 +168,21 @@ targets:
         buildPhase: resources
       - path: LICENSE
         buildPhase: resources
+    # The container large transfers go through; see the watch target above.
+    entitlements:
+      path: DialectCompanion/DialectCompanion.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.iamrecursion.dialect
+        com.apple.developer.icloud-services:
+          - CloudKit
     dependencies:
       - target: Dialect
         embed: true
-    # `xcodebuild test -scheme DialectCompanion` runs its UI tests.
+    # `xcodebuild test -scheme DialectCompanion` runs its unit and UI tests.
     scheme:
       testTargets:
+        - DialectCompanionTests
         - DialectCompanionUITests
     settings:
       base:
@@ -174,8 +197,22 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
 
-  # The companion's UI tests, against a fake watch (`-fakeWatch`). Its logic is in `Common/`, unit
-  # tested in DialectTests. Run them with `make companion-test`.
+  # The companion's unit tests for what can't live in `Common/`. Run them with `make
+  # companion-unit-test`.
+  DialectCompanionTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: DialectCompanionTests
+    dependencies:
+      - target: DialectCompanion
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iamrecursion.dialect.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  # The companion's UI tests, against a fake watch (`-fakeWatch`). Run them with `make
+  # companion-test`.
   DialectCompanionUITests:
     type: bundle.ui-testing
     platform: iOS

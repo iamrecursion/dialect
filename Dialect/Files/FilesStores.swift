@@ -2,8 +2,8 @@ import Foundation
 
 /// Where Files keeps data that isn't the user's files.
 enum FilesStores {
-    /// The stores in use.
-    @MainActor static var url = URL.applicationSupportDirectory.appending(
+    /// The stores for the files in Documents.
+    static let standard = URL.applicationSupportDirectory.appending(
         path: "Files", directoryHint: .isDirectory)
 
     /// Where new items are made before they're renamed into place.

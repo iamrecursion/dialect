@@ -18,6 +18,10 @@ protocol SettingsSession: AnyObject {
 
     /// Sends the phone a message at once.
     func sendNow(_ message: [String: Any], failed: @escaping @Sendable (any Error) -> Void)
+
+    /// Queues user info for the phone, which gets it even if it's not
+    /// reachable.
+    func sendInfo(_ info: [String: Any])
 }
 
 extension WCSession: SettingsSession {
@@ -29,6 +33,10 @@ extension WCSession: SettingsSession {
 
     func sendNow(_ message: [String: Any], failed: @escaping @Sendable (any Error) -> Void) {
         sendMessage(message, replyHandler: nil, errorHandler: failed)
+    }
+
+    func sendInfo(_ info: [String: Any]) {
+        transferUserInfo(info)
     }
 }
 
@@ -43,29 +51,21 @@ extension WCSession: SettingsSession {
 /// It applies the edits in the phone's messages and application context by the
 /// rule of `Mirror.applying(_:over:)`, and sends a new snapshot at once.
 ///
+/// It answers the phone's requests for Files: by reply, off the main actor, as
+/// they come, or by user info, in turn, for one sent while the phone couldn't
+/// reach Dialect.
+///
 /// Without a paired phone, the session never becomes active and nothing is
 /// sent.
 @MainActor
 final class WatchLink {
-    static let shared = WatchLink(
-        session: WCSession.default, mirror: .standard, defaults: .standard,
-        watchName: WKInterfaceDevice.current().name,
-        undoSteps: {
-            let stacks = FilesRoot.operations.history.read()
-            return stacks.undo.count + stacks.redo.count
-        },
-        trimHistory: trimFilesHistory)
-
-    private static func trimFilesHistory(to steps: Int) async {
-        try? await FilesRoot.operations.trimHistory(to: steps)
-    }
-
     private let session: SettingsSession
     private let mirror: Mirror
     private let defaults: UserDefaults
     private let watchName: String
     private let undoSteps: @MainActor () -> Int
     private let trimHistory: @MainActor (Int) async -> Void
+    private let files: FilesService?
     private let delay: Duration
 
     /// The publish waiting for the settings to settle.
@@ -78,6 +78,9 @@ final class WatchLink {
     /// the history's new length.
     private var trimming: Task<Void, Never>?
 
+    /// The last of the answers being sent by user info.
+    private var answering: Task<Void, Never>?
+
     /// Whether the edits the session held at activation have been applied.
     private var activationHandled = false
 
@@ -87,7 +90,8 @@ final class WatchLink {
     init(
         session: SettingsSession, mirror: Mirror, defaults: UserDefaults, watchName: String,
         undoSteps: @escaping @MainActor () -> Int,
-        trimHistory: @escaping @MainActor (Int) async -> Void, delay: Duration = .milliseconds(500)
+        trimHistory: @escaping @MainActor (Int) async -> Void, files: FilesService? = nil,
+        delay: Duration = .milliseconds(500)
     ) {
         self.session = session
         self.mirror = mirror
@@ -95,7 +99,23 @@ final class WatchLink {
         self.watchName = watchName
         self.undoSteps = undoSteps
         self.trimHistory = trimHistory
+        self.files = files
         self.delay = delay
+    }
+
+    /// The app's link: it reports and trims the undo history of `operations`,
+    /// and answers Files from its root.
+    convenience init(operations: FileOperations) {
+        self.init(
+            session: WCSession.default, mirror: .standard, defaults: .standard,
+            watchName: WKInterfaceDevice.current().name,
+            undoSteps: {
+                let stacks = operations.history.read()
+                return stacks.undo.count + stacks.redo.count
+            },
+            trimHistory: { try? await operations.trimHistory(to: $0) },
+            files: FilesService(
+                root: operations.root, stores: operations.stores, defaults: .standard))
     }
 
     /// Activates the session and follows the settings.
@@ -105,7 +125,9 @@ final class WatchLink {
         let delegate = SessionDelegate(
             activated: { [weak self] edits in self?.activated(with: edits) },
             reachable: { [weak self] in self?.phoneBecameReachable() },
-            received: { [weak self] edits, answering in self?.apply(edits, answering: answering) })
+            received: { [weak self] edits, answering in self?.apply(edits, answering: answering) },
+            filesRequest: { [weak self] request in self?.answer(request) },
+            files: files)
         self.delegate = delegate
         WCSession.default.delegate = delegate
         WCSession.default.activate()
@@ -192,9 +214,20 @@ final class WatchLink {
         }
     }
 
+    /// Answers a request from Files by user info, after those before it. A
+    /// request too old for the phone to be waiting gets no answer.
+    func answer(_ request: FilesUserInfo) {
+        guard let files else { return }
+        answering = Task { [session, previous = answering] in
+            await previous?.value
+            guard let answer = await files.answer(request, now: Date()) else { return }
+            session.sendInfo(answer.propertyList)
+        }
+    }
+
     /// For a WatchConnectivity background task: waits, ten seconds at most, for
     /// the session to activate and deliver what the system held for it, then
-    /// for any history trim, and publishes.
+    /// for any history trim and answers to the phone, and publishes.
     func waitForDelivery() async {
         for _ in 0..<100 {
             guard !activationHandled || session.hasContentPending else { break }
@@ -203,6 +236,7 @@ final class WatchLink {
         // The delegate passes deliveries to the main actor; let the last ones apply.
         try? await Task.sleep(for: .milliseconds(100))
         await trimming?.value
+        await answering?.value
         publish()
     }
 
@@ -231,15 +265,21 @@ private final class SessionDelegate: NSObject, WCSessionDelegate {
     private let reachable: @MainActor @Sendable () -> Void
     /// Called with the edits and whether they came by message.
     private let received: @MainActor @Sendable (PhoneEdits, Bool) -> Void
+    private let filesRequest: @MainActor @Sendable (FilesUserInfo) -> Void
+    private let files: FilesService?
 
     init(
         activated: @escaping @MainActor @Sendable (PhoneEdits?) -> Void,
         reachable: @escaping @MainActor @Sendable () -> Void,
-        received: @escaping @MainActor @Sendable (PhoneEdits, Bool) -> Void
+        received: @escaping @MainActor @Sendable (PhoneEdits, Bool) -> Void,
+        filesRequest: @escaping @MainActor @Sendable (FilesUserInfo) -> Void,
+        files: FilesService?
     ) {
         self.activated = activated
         self.reachable = reachable
         self.received = received
+        self.filesRequest = filesRequest
+        self.files = files
     }
 
     private func onMain(_ action: @escaping @MainActor @Sendable () -> Void) {
@@ -271,5 +311,26 @@ private final class SessionDelegate: NSObject, WCSessionDelegate {
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         guard let edits = PhoneEdits(propertyList: message) else { return }
         onMain { [received] in received(edits, true) }
+    }
+
+    /// A request from Files. The reply handler is called off the main actor, as
+    /// WatchConnectivity traps otherwise.
+    func session(
+        _ session: WCSession, didReceiveMessageData data: Data,
+        replyHandler: @escaping (Data) -> Void
+    ) {
+        nonisolated(unsafe) let reply = replyHandler
+        guard let files else {
+            reply(Data())
+            return
+        }
+        Task { reply(await files.replyData(to: data)) }
+    }
+
+    /// A request from Files sent while Dialect wasn't reachable, as when
+    /// dimmed.
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        guard let request = FilesUserInfo(request: userInfo) else { return }
+        onMain { [filesRequest] in filesRequest(request) }
     }
 }

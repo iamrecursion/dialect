@@ -6,7 +6,7 @@ import Testing
 /// Folders' and sessions' totals, worked out in the background.
 struct FolderSizesTests {
     private func total(_ root: TemporaryRoot, _ path: String) async -> Int64? {
-        return await FolderSizes().size(of: root.url.appending(path: path), modified: nil)
+        return await FolderSizes().size(of: FilePath(path), root: root.url, modified: nil)
     }
 
     @Test func addsUpANestedTree() async throws {
@@ -19,6 +19,16 @@ struct FolderSizesTests {
         #expect(await total(root, "tree") == 4123)
         #expect(await total(root, "tree/empty") == 0)
         #expect(await total(root, "gone") == 0)
+    }
+
+    /// Only the root's total skips it, and only the one directly in the root.
+    @Test func leavesOutTheInboxAtTheRoot() async throws {
+        let root = try TemporaryRoot()
+        try root.file("Inbox/a.bin", Data(count: 1000))
+        try root.file("notes/Inbox/b.bin", Data(count: 20))
+        try root.file("com.apple.watchconnectivity/c.bin", Data(count: 3))
+        #expect(await FolderSizes().size(of: .root, root: root.url, modified: nil) == 23)
+        #expect(await total(root, "notes") == 20)
     }
 
     /// A link back up the tree would loop forever if followed.
@@ -52,17 +62,17 @@ struct FolderSizesTests {
         try root.file("a/b/c/one.txt", Data(count: 1))
         try root.file("other/one.txt", Data(count: 1))
         let sizes = FolderSizes()
-        let folders = ["a", "a/b", "a/b/c", "other"].map { root.url.appending(path: $0) }
+        let folders = ["a", "a/b", "a/b/c", "other"].map(FilePath.init)
         for folder in folders {
-            #expect(await sizes.size(of: folder, modified: nil) == 1)
+            #expect(await sizes.size(of: folder, root: root.url, modified: nil) == 1)
         }
         try root.file("a/b/c/two.txt", Data(count: 2))
         try root.file("other/two.txt", Data(count: 2))
         await sizes.forget(containing: root.url.appending(path: "a/b/c/two.txt"))
         for folder in folders.prefix(3) {
-            #expect(await sizes.size(of: folder, modified: nil) == 3)
+            #expect(await sizes.size(of: folder, root: root.url, modified: nil) == 3)
         }
-        #expect(await sizes.size(of: folders[3], modified: nil) == 1)
+        #expect(await sizes.size(of: folders[3], root: root.url, modified: nil) == 1)
     }
 
     /// A folder renamed away and back again keeps nothing stale from inside it.
@@ -70,11 +80,11 @@ struct FolderSizesTests {
         let root = try TemporaryRoot()
         try root.file("a/b/one.txt", Data(count: 1))
         let sizes = FolderSizes()
-        let inner = root.url.appending(path: "a/b")
-        #expect(await sizes.size(of: inner, modified: nil) == 1)
+        let inner = FilePath("a/b")
+        #expect(await sizes.size(of: inner, root: root.url, modified: nil) == 1)
         try root.file("a/b/two.txt", Data(count: 2))
         await sizes.forget(containing: root.url.appending(path: "a"))
-        #expect(await sizes.size(of: inner, modified: nil) == 3)
+        #expect(await sizes.size(of: inner, root: root.url, modified: nil) == 3)
     }
 
     /// A walk given up part way gives no total, and isn't cached as one.
@@ -82,27 +92,28 @@ struct FolderSizesTests {
         let root = try TemporaryRoot()
         try root.file("tree/a.txt", Data(count: 10))
         let sizes = FolderSizes()
-        let folder = root.url.appending(path: "tree")
+        let folder = FilePath("tree")
         let cancelled = Task {
             withUnsafeCurrentTask { $0?.cancel() }
-            return await sizes.size(of: folder, modified: nil)
+            return await sizes.size(of: folder, root: root.url, modified: nil)
         }
         #expect(await cancelled.value == nil)
-        #expect(await sizes.size(of: folder, modified: nil) == 10)
+        #expect(await sizes.size(of: folder, root: root.url, modified: nil) == 10)
     }
 
     /// Keyed by the modification date it was asked with: the old total stands
     /// until that changes.
     @Test func cachesUntilTheModificationDateChanges() async throws {
         let root = try TemporaryRoot()
-        let folder = try root.folder("tree")
+        let folder = FilePath("tree")
         try root.file("tree/a.txt", Data(count: 10))
         let sizes = FolderSizes()
         let first = Date(timeIntervalSince1970: 1)
-        #expect(await sizes.size(of: folder, modified: first) == 10)
+        #expect(await sizes.size(of: folder, root: root.url, modified: first) == 10)
 
         try root.file("tree/b.txt", Data(count: 5))
-        #expect(await sizes.size(of: folder, modified: first) == 10)
-        #expect(await sizes.size(of: folder, modified: Date(timeIntervalSince1970: 2)) == 15)
+        #expect(await sizes.size(of: folder, root: root.url, modified: first) == 10)
+        let second = Date(timeIntervalSince1970: 2)
+        #expect(await sizes.size(of: folder, root: root.url, modified: second) == 15)
     }
 }

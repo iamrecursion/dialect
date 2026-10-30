@@ -1,6 +1,6 @@
 import Foundation
 
-/// Modified and Created as shown by the item rows and info screen.
+/// Modified and Created in the item rows and info screen.
 enum DateDisplay {
     /// `startsSentence` capitalizes a relative date: "Yesterday", or "Deleted
     /// yesterday" without it.
@@ -36,8 +36,7 @@ enum DateDisplay {
         }
     }
 
-    /// `2026-10-03 14:05`, or `2026-10-03 2:05 PM` in 12-hour time, in any
-    /// language.
+    /// `2026-10-03 14:05`, or `2026-10-03 2:05 PM` in 12-hour time.
     private static func iso(_ date: Date, use24Hour: Bool, timeZone: TimeZone) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone

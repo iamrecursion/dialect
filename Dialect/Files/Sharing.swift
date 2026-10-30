@@ -210,12 +210,14 @@ struct ShareRow: View {
     /// Called as the receiving app takes it, which a canceled share never does.
     var sent: @MainActor @Sendable () -> Void = {}
 
+    @Environment(\.fileOperations) private var operations
+
     var body: some View {
         switch shared {
         case .file(let path):
             ShareLink(
                 item: SharedFile(
-                    path: path, root: FilesRoot.url, stores: FilesStores.url, sent: sent),
+                    path: path, root: operations.root, stores: operations.stores, sent: sent),
                 preview: SharePreview(shared.name)
             ) {
                 label
@@ -223,7 +225,7 @@ struct ShareRow: View {
         case .archive(let paths, let name):
             ShareLink(
                 item: SharedArchive(
-                    paths: paths, name: name, root: FilesRoot.url, stores: FilesStores.url,
+                    paths: paths, name: name, root: operations.root, stores: operations.stores,
                     sent: sent),
                 preview: SharePreview(name)
             ) {

@@ -73,6 +73,7 @@ struct FolderMoreScreen: View {
 
     @Environment(Navigation.self) private var navigation
     @Environment(FileSelection.self) private var selection
+    @Environment(\.fileOperations) private var operations
     @AppStorage(FileSettings.showHiddenKey) private var showHidden =
         FileSettings.showHiddenDefault
 
@@ -104,7 +105,7 @@ struct FolderMoreScreen: View {
                     }
                 }
             }
-            UndoRows(here: path)
+            UndoRows(here: path, operations: operations)
                 .disabled(deleting)
             Section {
                 ForEach([Action.sort, .group, .showHidden, .folderInfo], id: \.self, content: row)
@@ -134,9 +135,9 @@ struct FolderMoreScreen: View {
             if sent { selection.end() }
         }
         .task {
-            let bin = FilesRoot.operations.bin
+            let bin = operations.bin
             let days = FileSettings.emptyTrashAfter()
-            let (paths, root) = (isSelecting ? selection.selected : [], FilesRoot.url)
+            let (paths, root) = (isSelecting ? selection.selected : [], operations.root)
             async let empty = Task.detached {
                 bin.items().allSatisfy { $0.isExpired(now: Date(), after: days) }
             }.value
@@ -214,7 +215,7 @@ struct FolderMoreScreen: View {
         Task {
             defer { deleting = false }
             do {
-                _ = try await FilesRoot.operations.delete([path])
+                _ = try await operations.delete([path])
                 navigation.leave(path)
             } catch {
                 failure = OperationFailure("Couldn't Delete", error)
@@ -228,8 +229,10 @@ struct FolderMoreScreen: View {
 struct SortScreen: View {
     let path: FilePath
 
+    @Environment(\.fileOperations) private var operations
+
     var body: some View {
-        ViewSettingsScreen(path: path, title: "Sort") { settings, choose in
+        ViewSettingsScreen(path: path, root: operations.root, title: "Sort") { settings, choose in
             Section {
                 ForEach(FolderViewSettings.SortKey.allCases, id: \.self) { key in
                     ChoiceRow(title: key.title, isChosen: settings.sort == key) {
@@ -253,8 +256,10 @@ struct SortScreen: View {
 struct GroupScreen: View {
     let path: FilePath
 
+    @Environment(\.fileOperations) private var operations
+
     var body: some View {
-        ViewSettingsScreen(path: path, title: "Group") { settings, choose in
+        ViewSettingsScreen(path: path, root: operations.root, title: "Group") { settings, choose in
             ForEach(FolderViewSettings.Grouping.allCases, id: \.self) { grouping in
                 ChoiceRow(title: grouping.title, isChosen: settings.grouping == grouping) {
                     choose { $0.grouping = grouping }
@@ -293,6 +298,7 @@ private struct ViewSettingsScreen<Content: View>: View {
     typealias Choose = (_ change: (inout FolderViewSettings) -> Void) -> Void
 
     let path: FilePath
+    let root: URL
     let title: LocalizedStringResource
     let content: (FolderViewSettings, @escaping Choose) -> Content
 
@@ -301,14 +307,15 @@ private struct ViewSettingsScreen<Content: View>: View {
     @State private var failure: String?
 
     init(
-        path: FilePath, title: LocalizedStringResource,
+        path: FilePath, root: URL, title: LocalizedStringResource,
         @ViewBuilder content: @escaping (FolderViewSettings, @escaping Choose) -> Content
     ) {
         self.path = path
+        self.root = root
         self.title = title
         self.content = content
         // Read at once, as it's one small attribute, so the screen's first frame has its rows.
-        _settings = State(initialValue: FolderViewSettings.read(at: path.url(in: FilesRoot.url)))
+        _settings = State(initialValue: FolderViewSettings.read(at: path.url(in: root)))
     }
 
     var body: some View {
@@ -327,7 +334,7 @@ private struct ViewSettingsScreen<Content: View>: View {
         var updated = settings
         change(&updated)
         do {
-            try updated.write(to: path.url(in: FilesRoot.url))
+            try updated.write(to: path.url(in: root))
             navigation.pop()
         } catch {
             failure = error.localizedDescription

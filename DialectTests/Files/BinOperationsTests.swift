@@ -115,10 +115,10 @@ struct BinOperationsTests {
         let setup = try OperationsSetup()
         try setup.root.file("tree/sub/a.txt", Data(count: 10))
         try setup.root.file("tree/sub/b.txt", Data(count: 5))
-        let tree = setup.root.url.appending(path: "tree")
-        #expect(await setup.sizes.size(of: tree, modified: nil) == 15)
+        let tree = FilePath("tree")
+        #expect(await setup.sizes.size(of: tree, root: setup.root.url, modified: nil) == 15)
         _ = try await setup.operations.delete([FilePath("tree/sub/b.txt")])
-        #expect(await setup.sizes.size(of: tree, modified: nil) == 10)
+        #expect(await setup.sizes.size(of: tree, root: setup.root.url, modified: nil) == 10)
     }
 
     // MARK: Restoring
@@ -164,6 +164,25 @@ struct BinOperationsTests {
             at: setup.root.url.appending(path: "scripts"),
             to: setup.root.url.appending(path: "Scripts"))
         #expect(try await setup.operations.restore(item).path == FilePath("Scripts/a.scm"))
+    }
+
+    /// An item named like the inbox comes back dated, and one from inside it
+    /// comes back in a dated folder.
+    @Test func restoresAroundTheInbox() async throws {
+        let setup = try OperationsSetup()
+        try setup.root.file("Inbox", text: "named")
+        let named = try #require(
+            try await setup.operations.delete([FilePath("Inbox")], now: noon).first)
+        #expect(try await setup.operations.restore(named).path == FilePath("Inbox-2026-10-05"))
+        #expect(!setup.exists("Inbox"))
+
+        try setup.root.file("Inbox/inside.txt", text: "inside")
+        let inside = try #require(
+            try await setup.operations.delete([FilePath("Inbox/inside.txt")], now: noon).first)
+        #expect(
+            try await setup.operations.restore(inside).path
+                == FilePath("Inbox-2026-10-05 2/inside.txt"))
+        #expect(try setup.names("Inbox").isEmpty)
     }
 
     /// A taken name gets the deletion date before the extension, then a number

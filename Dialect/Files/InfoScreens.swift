@@ -21,7 +21,7 @@ struct LoadedInfo: Sendable, Equatable {
                 let item = try? FileListing.item(
                     at: path, root: root, textExtensions: textExtensions)
             else { return nil }
-            let itemCount = countsItems ? FileInfo.itemCount(at: path.url(in: root)) : nil
+            let itemCount = countsItems ? FileInfo.itemCount(of: path, root: root) : nil
             return LoadedInfo(item: item, size: item.size, itemCount: itemCount)
         }.value
     }
@@ -31,16 +31,15 @@ struct LoadedInfo: Sendable, Equatable {
     func withTotal(root: URL) async -> LoadedInfo {
         guard item.isDirectory else { return self }
         let total = await FolderSizes.shared.size(
-            of: item.path.url(in: root), modified: item.modified)
+            of: item.path, root: root, modified: item.modified)
         return LoadedInfo(item: item, size: total ?? size, itemCount: itemCount)
     }
 
     /// Reads an item, hands it over, then hands it over again with its total.
     @MainActor
     static func load(
-        _ path: FilePath, countsItems: Bool, into deliver: (LoadedInfo?) -> Void
+        _ path: FilePath, root: URL, countsItems: Bool, into deliver: (LoadedInfo?) -> Void
     ) async {
-        let root = FilesRoot.url
         let info = await load(path, root: root, countsItems: countsItems)
         deliver(info)
         guard let info, info.item.isDirectory else { return }
@@ -177,6 +176,7 @@ struct MissingItem: View {
 struct FolderInfoScreen: View {
     let path: FilePath
 
+    @Environment(\.fileOperations) private var operations
     @State private var info: LoadedInfo?
     @State private var loaded = false
 
@@ -190,7 +190,7 @@ struct FolderInfoScreen: View {
         }
         .navigationTitle("Folder Info")
         .task {
-            await LoadedInfo.load(path, countsItems: true) {
+            await LoadedInfo.load(path, root: operations.root, countsItems: true) {
                 info = $0
                 loaded = true
             }
@@ -203,6 +203,7 @@ struct FolderInfoScreen: View {
 struct ExtendedInfoScreen: View {
     let path: FilePath
 
+    @Environment(\.fileOperations) private var operations
     @State private var info: ExtendedInfo?
     @State private var loaded = false
 
@@ -249,7 +250,7 @@ struct ExtendedInfoScreen: View {
         }
         .navigationTitle("Extended")
         .task {
-            let url = path.url(in: FilesRoot.url)
+            let url = path.url(in: operations.root)
             info = await Task.detached { FileInfo.extended(at: url) }.value
             loaded = true
         }

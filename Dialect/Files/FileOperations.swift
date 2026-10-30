@@ -220,7 +220,7 @@ actor FileOperations {
 
     /// Puts the item back where it was, recreating missing folders. A taken
     /// name gets the deletion date added, as does a folder on its path where a
-    /// file now stands. Returns where it went.
+    /// file now stands or that would be the inbox. Returns where it went.
     func restore(_ item: BinItem, timeZone: TimeZone = .current) async throws -> Restored {
         bin.tidy()
         pruneHeld()
@@ -274,7 +274,7 @@ actor FileOperations {
             item.original.parent ?? .root, deleted: item.deleted, timeZone: timeZone)
         let restored: FilePath
         do {
-            let taken = try contents(of: folder)
+            let taken = try takenNames(in: folder)
             var name = item.name
             if taken.contains(where: { NameRules.sameName($0, name) }) {
                 let dated = NameNumbering.dated(
@@ -318,10 +318,12 @@ actor FileOperations {
     }
 
     /// The folder `name` in `folder`, made if nothing has the name; `nil` when
-    /// something that isn't a folder has it.
+    /// something that isn't a folder has it, or it's the inbox.
     private func enter(_ name: String, in folder: FilePath) throws -> (path: FilePath, made: Bool)?
     {
-        if let existing = try contents(of: folder).first(where: { NameRules.sameName($0, name) }) {
+        if NameRules.isInbox(name, in: folder) { return nil }
+        if let existing = try takenNames(in: folder).first(where: { NameRules.sameName($0, name) })
+        {
             let path = folder.appending(existing)
             let kind = Self.kind(at: path.url(in: root))
             return kind == .folder || kind == .session ? (path, false) : nil
@@ -394,18 +396,20 @@ actor FileOperations {
         _ name: String, kind: NewItemKind, in folder: FilePath, current: String? = nil
     ) throws {
         if let problem = NameRules.problem(
-            typed: name, full: name, kind: kind, taken: try contents(of: folder),
-            current: current)
+            typed: name, full: name, kind: kind, taken: try takenNames(in: folder),
+            current: current, in: folder)
         {
             throw FileOperationError.name(problem)
         }
     }
 
-    /// Every name in `folder`, hidden ones included.
-    func contents(of folder: FilePath) throws -> [String] {
+    /// Every name taken in `folder`: its entries, hidden ones included, and at
+    /// the root the inbox's name, whether or not the inbox exists.
+    func takenNames(in folder: FilePath) throws -> [String] {
         do {
-            return try FileManager.default.contentsOfDirectory(
+            let names = try FileManager.default.contentsOfDirectory(
                 atPath: folder.url(in: root).path(percentEncoded: false))
+            return folder == .root ? names + [FilePath.inboxName] : names
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
             throw FileOperationError.gone(Self.displayName(of: folder))
         }

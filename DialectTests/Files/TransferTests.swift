@@ -79,6 +79,26 @@ struct TransferTests {
 
     // MARK: Clashes
 
+    /// An item named like the inbox goes in numbered, with nothing to ask and
+    /// nothing to replace, whether or not the folder is there.
+    @Test func numbersAroundTheInbox() async throws {
+        let setup = try OperationsSetup()
+        try setup.root.file("notes/Inbox", text: "copied")
+        try await setup.operations.copy([FilePath("notes/Inbox")])
+        #expect(try await setup.operations.clashes(.paste, into: .root).isEmpty)
+        let pasted = try await setup.operations.paste(into: .root, choices: [:])
+        #expect(pasted.map(\.placed) == [FilePath("Inbox 2")])
+
+        try setup.root.file("Inbox/kept.txt", text: "kept")
+        try await setup.operations.copy([FilePath("notes/Inbox")])
+        #expect(try await setup.operations.clashes(.move, into: .root).isEmpty)
+        let moved = try await setup.operations.move(into: .root, choices: [:])
+        #expect(moved.map(\.placed) == [FilePath("Inbox 3")])
+        #expect(moved.first?.replaced == nil)
+        #expect(try setup.text("Inbox/kept.txt") == "kept")
+        #expect(setup.bin.items().isEmpty)
+    }
+
     private func clashSetup() async throws -> OperationsSetup {
         let setup = try OperationsSetup()
         try setup.root.file("notes/todo.txt", text: "new")
@@ -355,13 +375,19 @@ struct TransferTests {
             }
         }
         try pin()
-        #expect(await setup.sizes.size(of: notes, modified: date) == 4)
-        #expect(await setup.sizes.size(of: archive, modified: date) == 0)
+        #expect(
+            await setup.sizes.size(of: FilePath("notes"), root: setup.root.url, modified: date) == 4
+        )
+        #expect(
+            await setup.sizes.size(of: FilePath("archive"), root: setup.root.url, modified: date)
+                == 0)
 
         try await setup.operations.copy([FilePath("notes/todo.txt")])
         _ = try await setup.operations.paste(into: FilePath("archive"), choices: [:])
         try pin()
-        #expect(await setup.sizes.size(of: archive, modified: date) == 4)
+        #expect(
+            await setup.sizes.size(of: FilePath("archive"), root: setup.root.url, modified: date)
+                == 4)
 
         _ = try await setup.operations.move(
             into: FilePath("archive"),
@@ -369,6 +395,8 @@ struct TransferTests {
                 FilePath("notes/todo.txt"): .replace
             ])
         try pin()
-        #expect(await setup.sizes.size(of: notes, modified: date) == 0)
+        #expect(
+            await setup.sizes.size(of: FilePath("notes"), root: setup.root.url, modified: date) == 0
+        )
     }
 }

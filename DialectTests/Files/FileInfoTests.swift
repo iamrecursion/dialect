@@ -166,7 +166,22 @@ struct FileInfoTests {
         try root.file("a/one.txt")
         try root.file("a/.hidden")
         try root.folder("a/sub")
-        #expect(FileInfo.itemCount(at: root.url.appending(path: "a")) == 3)
-        #expect(FileInfo.itemCount(at: root.url.appending(path: "gone")) == nil)
+        #expect(FileInfo.itemCount(of: FilePath("a"), root: root.url) == 3)
+        #expect(FileInfo.itemCount(of: FilePath("gone"), root: root.url) == nil)
+    }
+
+    /// The root's count and total leave out the inbox; those of any other
+    /// folder keep one of that name.
+    @Test func leavesOutTheInboxAtTheRoot() async throws {
+        let root = try TemporaryRoot()
+        try root.file("notes/Inbox/a.bin", Data(count: 10))
+        try root.file("Inbox/b.bin", Data(count: 1000))
+        let top = try #require(await LoadedInfo.load(.root, root: root.url, countsItems: true))
+        #expect(top.itemCount == 1)
+        #expect(await top.withTotal(root: root.url).size == 10)
+        let notes = try #require(
+            await LoadedInfo.load(FilePath("notes"), root: root.url, countsItems: true))
+        #expect(notes.itemCount == 1)
+        #expect(await notes.withTotal(root: root.url).size == 10)
     }
 }

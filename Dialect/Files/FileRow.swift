@@ -1,31 +1,6 @@
 import SwiftUI
 import WatchKit
 
-/// The settings shaping a folder's rows, read once for all of them.
-struct FileRowStyle {
-    var showExtensions: Bool
-    var showDetails: Bool
-    var relativeModified: Bool
-    var dateStyle: DateStyle
-    var use24Hour: Bool
-
-    /// What relative dates count back from.
-    var now: Date
-    var timeZone: TimeZone = .current
-
-    /// The detail line: "*Modified* ∘ *Size*", with "—" for anything unknown,
-    /// such as a folder's size before it's worked out.
-    func detail(for item: FileItem, size: Int64?) -> String {
-        let modified =
-            item.modified.map {
-                DateDisplay.string(
-                    for: $0, now: now, relative: relativeModified, style: dateStyle,
-                    use24Hour: use24Hour, timeZone: timeZone)
-            } ?? "—"
-        return "\(modified) ∘ \(SizeDisplay.string(size))"
-    }
-}
-
 /// One item in a folder: its icon, its name, and its details when shown. A tap
 /// opens it; a long press, or VoiceOver's More action, opens its More screen.
 /// Swiping left offers Delete and More, and swiping right Copy and Select, each

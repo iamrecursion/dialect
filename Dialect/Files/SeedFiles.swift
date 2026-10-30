@@ -5,11 +5,11 @@
     import ImageIO
     import UniformTypeIdentifiers
 
-    /// `-seedFiles`: Files' root moves to a fresh sample tree in the app's
-    /// temporary directory, so UI tests and screenshots never touch real files.
-    /// The tree holds every kind of item, a session, hidden items, a deep path,
-    /// enough items to scroll, and modification dates in every Group by
-    /// Modified bucket.
+    /// `-seedFiles`: Files' root is a fresh sample tree in the app's temporary
+    /// directory, so UI tests and screenshots never touch real files. The tree
+    /// holds every kind of item, a session, hidden items, a deep path, enough
+    /// items to scroll, and modification dates in every Group by Modified
+    /// bucket.
     enum SeedFiles {
         /// The launch argument.
         static let argument = "seedFiles"

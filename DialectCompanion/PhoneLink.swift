@@ -2,8 +2,8 @@ import Observation
 import WatchConnectivity
 import os
 
-/// What the phone knows of the watch, kept up to date from the session, and the
-/// phone's edits to the watch's settings. The session keeps both apps' last
+/// What the phone knows about the watch, kept up to date from the session, and
+/// the phone's edits to the watch's settings. The session keeps both apps' last
 /// application contexts.
 @MainActor @Observable
 final class PhoneLink {
@@ -17,13 +17,19 @@ final class PhoneLink {
     /// goes back to Settings or edits them again.
     private(set) var changedOnWatch: Set<String> = []
 
+    /// Where Files keeps what it remembers of this watch, inside
+    /// `WCSession.watchDirectoryURL`, which is `nil` until the session is
+    /// active and changes with the watch.
+    private(set) var watchDirectory: URL?
+
     @ObservationIgnored private var delegate: SessionDelegate?
 
     /// The send waiting for the edits to settle.
     @ObservationIgnored private var sending: Task<Void, Never>?
 
-    init(facts: LinkFacts? = nil) {
+    init(facts: LinkFacts? = nil, watchDirectory: URL? = nil) {
         self.facts = facts
+        self.watchDirectory = watchDirectory
     }
 
     var status: LinkStatus? { facts.map(LinkStatus.init) }
@@ -114,10 +120,12 @@ final class PhoneLink {
     /// Takes the session's facts, and the snapshot that came with them if it's
     /// newer than the one held, then settles the edits the watch has handled
     /// and sends the rest again if the watch just became reachable.
-    private func update(
-        _ session: LinkFacts, snapshot: ReceivedSnapshot?, edits stored: PhoneEdits?
+    func update(
+        _ session: LinkFacts, snapshot: ReceivedSnapshot?, edits stored: PhoneEdits?,
+        watchDirectory: URL?
     ) {
         let wasReachable = facts?.isReachable ?? false
+        self.watchDirectory = watchDirectory
         var facts = session
         facts.snapshot = ReceivedSnapshot.latest(snapshot, over: self.facts?.snapshot ?? .none)
         self.facts = facts
@@ -138,10 +146,18 @@ final class PhoneLink {
         if facts.isReachable, !wasReachable, !edits.edits.isEmpty, sending == nil { send() }
     }
 
-    func start() {
+    /// Activates the session. Off the main actor, `filesAnswers` hears the
+    /// answers to requests from Files that came by user info, and
+    /// `reachability` whether the watch is reachable, each time the session
+    /// says.
+    func start(
+        filesAnswers: @escaping @Sendable (FilesUserInfo) -> Void,
+        reachability: @escaping @Sendable (Bool) -> Void
+    ) {
         guard WCSession.isSupported(), delegate == nil else { return }
-        let delegate = SessionDelegate { [weak self] facts, snapshot, edits in
-            self?.update(facts, snapshot: snapshot, edits: edits)
+        let delegate = SessionDelegate(filesAnswers: filesAnswers, reachability: reachability) {
+            [weak self] facts, snapshot, edits, directory in
+            self?.update(facts, snapshot: snapshot, edits: edits, watchDirectory: directory)
         }
         self.delegate = delegate
         WCSession.default.delegate = delegate
@@ -157,11 +173,20 @@ final class PhoneLink {
 /// the order they arrive.
 private final class SessionDelegate: NSObject, WCSessionDelegate {
     /// With the phone's edits from its context, at activation.
-    private let update: @MainActor @Sendable (LinkFacts, ReceivedSnapshot?, PhoneEdits?) -> Void
+    private let update:
+        @MainActor @Sendable (LinkFacts, ReceivedSnapshot?, PhoneEdits?, URL?) -> Void
+    private let filesAnswers: @Sendable (FilesUserInfo) -> Void
+    private let reachability: @Sendable (Bool) -> Void
 
     init(
-        update: @escaping @MainActor @Sendable (LinkFacts, ReceivedSnapshot?, PhoneEdits?) -> Void
+        filesAnswers: @escaping @Sendable (FilesUserInfo) -> Void,
+        reachability: @escaping @Sendable (Bool) -> Void,
+        update:
+            @escaping @MainActor @Sendable (LinkFacts, ReceivedSnapshot?, PhoneEdits?, URL?) ->
+            Void
     ) {
+        self.filesAnswers = filesAnswers
+        self.reachability = reachability
         self.update = update
     }
 
@@ -178,8 +203,13 @@ private final class SessionDelegate: NSObject, WCSessionDelegate {
             facts = LinkFacts(
                 isPaired: false, isWatchAppInstalled: false, isReachable: false, snapshot: .none)
         }
+        let directory =
+            session.activationState == .activated
+            ? session.watchDirectoryURL?.appending(path: "Files", directoryHint: .isDirectory)
+            : nil
+        reachability(facts.isReachable)
         DispatchQueue.main.async { [update] in
-            MainActor.assumeIsolated { update(facts, snapshot, edits) }
+            MainActor.assumeIsolated { update(facts, snapshot, edits, directory) }
         }
     }
 
@@ -199,6 +229,12 @@ private final class SessionDelegate: NSObject, WCSessionDelegate {
     /// The watch's snapshot, sent at once while the phone is reachable.
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         report(session, snapshot: ReceivedSnapshot(message: message))
+    }
+
+    /// An answer from Files, for a request sent while the watch wasn't
+    /// reachable.
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        if let answer = FilesUserInfo(answer: userInfo) { filesAnswers(answer) }
     }
 
     func sessionWatchStateDidChange(_ session: WCSession) {

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Runs the app's tests in a simulator: the unit tests (DialectTests, hosted by the watch app), the
 # smoke tests (DialectUITests/SmokeUITests) or the rest of the UI tests, in a watch; or the
-# companion's UI tests (DialectCompanionUITests), in an iPhone.
+# companion's unit tests (DialectCompanionTests) or UI tests (DialectCompanionUITests), in an iPhone.
 #
-# Usage: app-test.sh unit|smoke|ui|companion
+# Usage: app-test.sh unit|smoke|ui|companion-unit|companion
 #     SIMULATOR=  the watch, a name or UDID; by default the Ultra 4
 #     PHONE=      the iPhone, a name or UDID; by default the iPhone 18 Pro Max
 #
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
-simulator="${SIMULATOR:-Watch Ultra 4}"
+simulator="${SIMULATOR:-Apple Watch Ultra 4 (49mm)}"
 platform="watchOS Simulator"
 scheme=Dialect
 mode="${1:-}"
@@ -31,6 +31,12 @@ case "$mode" in
             -parallel-testing-enabled YES -parallel-testing-worker-count "${UI_WORKERS:-4}"
         )
         ;;
+    companion-unit)
+        simulator="${PHONE:-iPhone 18 Pro Max}"
+        platform="iOS Simulator"
+        scheme=DialectCompanion
+        selection=(-only-testing:DialectCompanionTests)
+        ;;
     companion)
         simulator="${PHONE:-iPhone 18 Pro Max}"
         platform="iOS Simulator"
@@ -38,7 +44,7 @@ case "$mode" in
         selection=(-only-testing:DialectCompanionUITests)
         ;;
     *)
-        echo "usage: app-test.sh unit|smoke|ui|companion" >&2
+        echo "usage: app-test.sh unit|smoke|ui|companion-unit|companion" >&2
         exit 2
         ;;
 esac

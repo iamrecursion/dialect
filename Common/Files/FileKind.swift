@@ -1,7 +1,7 @@
 import Foundation
 
 /// What an item is, which decides its icon, its group and its type name.
-enum FileKind: Sendable, CaseIterable {
+enum FileKind: String, Codable, Sendable, CaseIterable {
     /// A directory, unless it's named like a session.
     case folder
 
@@ -28,6 +28,15 @@ enum FileKind: Sendable, CaseIterable {
     /// isn't a regular file or a directory, such as a named pipe, or a broken
     /// link.
     case binary
+
+    /// A kind from a newer Dialect reads as a file of no known kind.
+    init(from decoder: any Decoder) throws {
+        let name = try decoder.singleValueContainer().decode(String.self)
+        self = FileKind(rawValue: name) ?? .binary
+    }
+
+    /// Folders and sessions.
+    var isDirectory: Bool { self == .folder || self == .session }
 
     /// How many bytes the text-like check reads from the start of a file.
     static let sniffLength = 4096
@@ -109,7 +118,7 @@ enum FileKind: Sendable, CaseIterable {
         }
     }
 
-    /// The kind spelled out, as Info's Type shows it.
+    /// The kind spelled out, for Info's Type.
     var typeName: LocalizedStringResource {
         switch self {
         case .folder: return "Folder"

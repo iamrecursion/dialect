@@ -30,7 +30,7 @@ struct InfoField: Hashable, Identifiable {
 
 /// What the Extended screen shows: permissions, owner and group, and extended
 /// attributes.
-struct ExtendedInfo: Equatable {
+struct ExtendedInfo: Codable, Equatable, Sendable {
     /// As `ls` writes them: `rw-r--r--`.
     let permissions: String
     /// What they mean, a line for each of owner, group and everyone.
@@ -48,7 +48,7 @@ enum FileInfo {
     /// - Parameters:
     ///   - size: a file's size, or a folder's total once worked out.
     ///   - itemCount: Folder Info's count of entries; `nil` leaves Items out.
-    ///   - date: Created and Modified as Settings › Appearance says.
+    ///   - date: Created and Modified, by Settings › Appearance.
     static func fields(
         for item: FileItem, size: Int64?, itemCount: Int?, date: (Date) -> String
     ) -> [InfoField] {
@@ -89,11 +89,12 @@ enum FileInfo {
         return value ? String(localized: "Yes") : String(localized: "No")
     }
 
-    /// Every entry in a folder, hidden ones included; `nil` when it can't be
-    /// read.
-    static func itemCount(at url: URL) -> Int? {
-        return try? FileManager.default.contentsOfDirectory(atPath: url.path(percentEncoded: false))
-            .count
+    /// Every entry in a folder but the inbox, hidden ones included; `nil` when
+    /// it can't be read.
+    static func itemCount(of folder: FilePath, root: URL) -> Int? {
+        let names = try? FileManager.default.contentsOfDirectory(
+            atPath: folder.url(in: root).path(percentEncoded: false))
+        return names?.filter { folder.appending($0) != .inbox }.count
     }
 
     /// An item's extended information, read without following a final symbolic

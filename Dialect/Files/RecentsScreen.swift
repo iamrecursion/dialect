@@ -6,6 +6,7 @@ import SwiftUI
 /// or pin it.
 struct RecentsScreen: View {
     @Environment(Navigation.self) private var navigation
+    @Environment(\.fileOperations) private var operations
     @AppStorage(FileSettings.showExtensionsKey) private var showExtensions =
         FileSettings.showExtensionsDefault
     @AppStorage(FileSettings.showHiddenKey) private var showHidden =
@@ -86,7 +87,7 @@ struct RecentsScreen: View {
         case .session: navigation.push(.session(item.path))
         default: viewing = item.path
         }
-        FilesRoot.opened(item.path)
+        operations.opened(item.path)
     }
 
     /// The row leaves at once, then Recents is read again, so a read begun
@@ -95,7 +96,7 @@ struct RecentsScreen: View {
         remove(item)
         Task {
             do {
-                try await FilesRoot.operations.hideRecent(item.path)
+                try await operations.hideRecent(item.path)
             } catch {
                 failure = OperationFailure("Couldn't Hide", error)
             }
@@ -107,7 +108,7 @@ struct RecentsScreen: View {
     /// Recents was read.
     private func show(_ item: FileItem) {
         guard isOnTop else { return }
-        let root = FilesRoot.url
+        let root = operations.root
         Task {
             let exists = await Task.detached { Clipboard.exists(item.path, in: root) }.value
             guard isOnTop else { return }
@@ -125,9 +126,9 @@ struct RecentsScreen: View {
         Task {
             do {
                 if pinning {
-                    try await FilesRoot.operations.pin(item.path)
+                    try await operations.pin(item.path)
                 } else {
-                    try await FilesRoot.operations.unpin(item.path)
+                    try await operations.unpin(item.path)
                 }
             } catch {
                 failure = OperationFailure(pinning ? "Couldn't Pin" : "Couldn't Unpin", error)
@@ -142,8 +143,8 @@ struct RecentsScreen: View {
     }
 
     private func load() async {
-        let recents = FilesRoot.operations.recents
-        let root = FilesRoot.url
+        let recents = operations.recents
+        let root = operations.root
         let textExtensions = FileSettings.textExtensions()
         let (showHidden, showLast) = (self.showHidden, self.showLast)
         listing = await Task.detached(priority: .userInitiated) {

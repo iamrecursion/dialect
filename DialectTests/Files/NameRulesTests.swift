@@ -8,10 +8,10 @@ import Testing
 struct NameRulesTests {
     private func problem(
         _ typed: String, _ kind: NewItemKind = .file, taken: [String] = [],
-        current: String? = nil
+        current: String? = nil, in folder: FilePath = FilePath("notes")
     ) -> NameProblem? {
         return NameRules.problem(
-            typed: typed, full: typed, kind: kind, taken: taken, current: current)
+            typed: typed, full: typed, kind: kind, taken: taken, current: current, in: folder)
     }
 
     // MARK: Refusals
@@ -19,12 +19,22 @@ struct NameRulesTests {
     @Test func refusesAnEmptyName() {
         #expect(problem("") == .empty)
         // A file with a kept extension still needs a base name.
-        #expect(NameRules.problem(typed: "", full: ".scm", kind: .file, taken: []) == .empty)
+        #expect(
+            NameRules.problem(typed: "", full: ".scm", kind: .file, taken: [], in: .root) == .empty)
     }
 
     @Test func refusesASlash() {
         #expect(problem("a/b") == .slash)
         #expect(problem("/") == .slash)
+    }
+
+    /// The inbox's exact name, ignoring case, is reserved only at the root.
+    @Test func reservesTheInboxAtTheRoot() {
+        #expect(problem("Inbox", .folder, in: .root) == .reserved)
+        #expect(problem("inbox", .file, in: .root) == .reserved)
+        #expect(problem("inbox", .folder, current: "notes", in: .root) == .reserved)
+        #expect(problem("Inbox", .folder) == nil)
+        #expect(problem("Inbox.txt", .file, in: .root) == nil)
     }
 
     @Test func refusesTheReservedNames() {

@@ -7,6 +7,7 @@ struct ClipboardScreen: View {
 
     @Environment(Navigation.self) private var navigation
     @Environment(FileSelection.self) private var selection
+    @Environment(\.fileOperations) private var operations
     @AppStorage(FileSettings.showExtensionsKey) private var showExtensions =
         FileSettings.showExtensionsDefault
 
@@ -88,8 +89,8 @@ struct ClipboardScreen: View {
     private var isOnTop: Bool { navigation.path.last == .clipboard(folder) }
 
     private func load() async {
-        let clipboard = FilesRoot.operations.clipboard
-        let root = FilesRoot.url
+        let clipboard = operations.clipboard
+        let root = operations.root
         let textExtensions = FileSettings.textExtensions()
         items = await Task.detached(priority: .userInitiated) {
             clipboard.items(root: root, textExtensions: textExtensions)
@@ -103,7 +104,7 @@ struct ClipboardScreen: View {
         Task {
             defer { clearing = false }
             do {
-                try await FilesRoot.operations.clearClipboard()
+                try await operations.clearClipboard()
                 navigation.pop(to: folderRoute)
             } catch {
                 failure = OperationFailure("Couldn't Clear", error)

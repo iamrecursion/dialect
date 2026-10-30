@@ -62,6 +62,7 @@ struct UndoLabel {
 struct UndoRows: View {
     /// The folder the screen belongs to.
     let here: FilePath
+    let operations: FileOperations
 
     @Environment(Navigation.self) private var navigation
     @State private var stacks: History.Stacks
@@ -77,11 +78,12 @@ struct UndoRows: View {
     @State private var asking: UndoChanged?
     @State private var question = ""
 
-    init(here: FilePath) {
+    init(here: FilePath, operations: FileOperations) {
         self.here = here
+        self.operations = operations
         // Read at once, so the rows are laid out with their labels: a label arriving later can be
         // cut short at the largest text.
-        _stacks = State(initialValue: Self.read(FilesRoot.operations.history))
+        _stacks = State(initialValue: Self.read(operations.history))
     }
 
     /// The history as last read, with its file's date: a More screen's body
@@ -136,7 +138,7 @@ struct UndoRows: View {
     }
 
     private func load() {
-        stacks = Self.read(FilesRoot.operations.history)
+        stacks = Self.read(operations.history)
     }
 
     private func act(undoing: Bool, confirmed: Bool = false) {
@@ -145,7 +147,6 @@ struct UndoRows: View {
         let title: LocalizedStringResource = undoing ? "Couldn't Undo" : "Couldn't Redo"
         Task {
             defer { acting = false }
-            let operations = FilesRoot.operations
             do {
                 let vacated =
                     undoing

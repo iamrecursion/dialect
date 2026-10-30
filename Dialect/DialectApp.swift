@@ -8,6 +8,8 @@ struct DialectApp: App {
     @State private var router = LaunchRouter.shared
     @AppStorage(AccentSetting.key) private var accent = RGBColor.dialectGreen.displayP3
     @Environment(\.scenePhase) private var scenePhase
+    private let operations: FileOperations
+    private let link: WatchLink
 
     init() {
         #if DEBUG
@@ -27,27 +29,16 @@ struct DialectApp: App {
             {
                 LaunchRouter.shared.open(url)
             }
-
-            // For UI tests and screenshots: Files shows a fresh sample tree instead of Documents,
-            // with separate stores.
-            if UserDefaults.standard.bool(forKey: SeedFiles.argument) {
-                do {
-                    try SeedFiles.build(at: SeedFiles.root, stores: SeedFiles.stores)
-                    FilesRoot.url = SeedFiles.root
-                    FilesStores.url = SeedFiles.stores
-                    FilesRoot.operations = FileOperations(
-                        root: SeedFiles.root, stores: SeedFiles.stores)
-                } catch {
-                    assertionFailure("Couldn't build the sample files: \(error)")
-                }
-            }
         #endif
 
-        WatchLink.shared.start()
+        let files = Self.filesLocation()
+        let operations = FileOperations(root: files.root, stores: files.stores)
+        self.operations = operations
+        link = WatchLink(operations: operations)
+        link.start()
 
         // Whatever was being made or shared when Dialect last stopped is abandoned.
-        let operations = FilesRoot.operations
-        let stores = FilesStores.url
+        let stores = operations.stores
         let emptyTrashAfter = FileSettings.emptyTrashAfter()
         Task.detached(priority: .background) {
             Sharing.clear(in: stores)
@@ -68,6 +59,7 @@ struct DialectApp: App {
             .environment(navigation)
             .environment(fileSelection)
             .environment(binSelection)
+            .fileOperations(operations)
             .onChange(of: navigation.path) { _, path in
                 fileSelection.follow(path)
                 binSelection.follow(path)
@@ -75,13 +67,13 @@ struct DialectApp: App {
             .onOpenURL { router.open($0) }
             // Sends what changes without a settings change, such as the undo history's length.
             .onChange(of: scenePhase) { _, phase in
-                if phase == .background { WatchLink.shared.publish() }
+                if phase == .background { link.publish() }
             }
             .onChange(of: router.pending, initial: true) { followLaunch() }
         }
         // The phone's edits, delivered while Dialect isn't open.
-        .backgroundTask(.watchConnectivity) {
-            await WatchLink.shared.waitForDelivery()
+        .backgroundTask(.watchConnectivity) { [link] in
+            await link.waitForDelivery()
         }
     }
 
@@ -90,6 +82,22 @@ struct DialectApp: App {
         guard let request = router.take() else { return }
         navigation.path = LaunchRouter.path(
             for: request, hasLatestSession: FakeSessions.hasLatestSession())
+    }
+
+    /// Files' root and stores: Documents, or for UI tests and screenshots under
+    /// `-seedFiles`, a fresh sample tree with separate stores.
+    private static func filesLocation() -> (root: URL, stores: URL) {
+        #if DEBUG
+            if UserDefaults.standard.bool(forKey: SeedFiles.argument) {
+                do {
+                    try SeedFiles.build(at: SeedFiles.root, stores: SeedFiles.stores)
+                    return (SeedFiles.root, SeedFiles.stores)
+                } catch {
+                    assertionFailure("Couldn't build the sample files: \(error)")
+                }
+            }
+        #endif
+        return (.documentsDirectory, FilesStores.standard)
     }
 
     /// Empty, except in a debug build launched with `-DialectPath` (see

@@ -79,6 +79,7 @@ struct FolderScreen: View {
     @Environment(Navigation.self) private var navigation
     @Environment(FileSelection.self) private var selection
     @Environment(\.dialectAccent) private var accent
+    @Environment(\.fileOperations) private var operations
 
     @AppStorage(FileSettings.showExtensionsKey) private var showExtensions =
         FileSettings.showExtensionsDefault
@@ -194,7 +195,9 @@ struct FolderScreen: View {
     /// nearest the root dropped for "…", down to the folder alone. "Files" at
     /// the root.
     nonisolated static func titles(for path: FilePath, showExtensions: Bool) -> [String] {
-        let names = path.components.map { displayName(of: $0, showExtensions: showExtensions) }
+        let names = path.components.map {
+            FileItem.displayName(of: $0, showExtensions: showExtensions)
+        }
         guard !names.isEmpty else { return [String(localized: "Files")] }
         return ["/" + names.joined(separator: "/")]
             + names.indices.dropFirst().map { "…/" + names[$0...].joined(separator: "/") }
@@ -206,12 +209,6 @@ struct FolderScreen: View {
         guard highlight > 0 else { return nil }
         return Color(
             RowHighlight.color(accent: accent.resolve(in: EnvironmentValues()), amount: highlight))
-    }
-
-    /// A folder's or entered session's name, as rows show it.
-    nonisolated static func displayName(of name: String, showExtensions: Bool) -> String {
-        let kind = FileKind.classify(name: name, isDirectory: true, textExtensions: [])
-        return kind == .session && !showExtensions ? FileItem.splitName(name).base : name
     }
 
     @ViewBuilder private var rows: some View {
@@ -285,10 +282,10 @@ struct FolderScreen: View {
         case .folder: navigation.push(.folder(item.path))
         case .session:
             navigation.push(.session(item.path))
-            FilesRoot.opened(item.path)
+            operations.opened(item.path)
         default:
             viewing = item.path
-            FilesRoot.opened(item.path)
+            operations.opened(item.path)
         }
     }
 
@@ -298,7 +295,7 @@ struct FolderScreen: View {
         deleting.formUnion(paths)
         Task {
             do {
-                _ = try await FilesRoot.operations.delete(paths)
+                _ = try await operations.delete(paths)
             } catch {
                 failure = OperationFailure("Couldn't Delete", error)
             }
@@ -314,7 +311,7 @@ struct FolderScreen: View {
         selection.end()
         Task {
             do {
-                try await FileOperations.copyWithTap(paths)
+                try await operations.copyWithTap(paths)
             } catch {
                 failure = OperationFailure("Couldn't Copy", error)
             }
@@ -338,7 +335,7 @@ struct FolderScreen: View {
     private func copy(_ item: FileItem) {
         Task {
             do {
-                try await FileOperations.copyWithTap([item.path])
+                try await operations.copyWithTap([item.path])
             } catch {
                 failure = OperationFailure("Couldn't Copy", error)
             }
@@ -405,10 +402,10 @@ struct FolderScreen: View {
     private func load() async {
         reads += 1
         let read = reads
-        let root = FilesRoot.url
+        let root = operations.root
         let (path, showHidden) = (self.path, listsHidden)
         let textExtensions = FileSettings.textExtensions()
-        let clipboard = FilesRoot.operations.clipboard
+        let clipboard = operations.clipboard
         let (loaded, held) = await Task.detached(priority: .userInitiated) {
             (
                 FolderLoader.load(
@@ -432,7 +429,7 @@ struct FolderScreen: View {
         for item in items where item.isDirectory {
             guard
                 let size = await FolderSizes.shared.size(
-                    of: item.path.url(in: root), modified: item.modified)
+                    of: item.path, root: root, modified: item.modified)
             else { return }
             guard read == reads else { return }
             arrived[item.path] = size

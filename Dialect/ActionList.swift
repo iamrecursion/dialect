@@ -17,6 +17,7 @@ struct ActionList<Rows: View>: View {
     @ViewBuilder var rows: Rows
 
     @Environment(\.dialectAccent) private var accent
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
     /// One point at the default text size, scaled with the buttons' icons.
     @ScaledMetric(relativeTo: .title3) private var point: CGFloat = 1
@@ -28,6 +29,10 @@ struct ActionList<Rows: View>: View {
     /// 34, 35). There is no API for that gray; the button draws its tint at
     /// reduced strength, and this value lands on it exactly for watchOS 27.
     private static var rowGray: Color { Color(red: 0.54, green: 0.54, blue: 0.55) }
+
+    /// The tint that makes the fill the rows' gray in Always On, (19, 19, 19).
+    /// A button doesn't dim its fill itself.
+    private static var dimmedRowGray: Color { Color(white: 0.3) }
 
     var body: some View {
         List {
@@ -62,7 +67,7 @@ struct ActionList<Rows: View>: View {
                     }
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.roundedRectangle)
-                    .tint(Self.rowGray)
+                    .tint(isLuminanceReduced ? Self.dimmedRowGray : Self.rowGray)
                     .disabled(item.isDisabled)
                     // Icon only, so VoiceOver needs the title.
                     .accessibilityLabel(Text(item.title))

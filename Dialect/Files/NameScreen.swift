@@ -20,6 +20,7 @@ struct NameScreen: View {
     let purpose: NamePurpose
 
     @Environment(Navigation.self) private var navigation
+    @Environment(\.fileOperations) private var operations
     @AppStorage(FileSettings.showExtensionsKey) private var showExtensions =
         FileSettings.showExtensionsDefault
     @AppStorage(FileSettings.confirmExtensionChangesKey) private var confirmExtensionChanges =
@@ -171,7 +172,7 @@ struct NameScreen: View {
         case .create:
             break
         case .rename(let path):
-            let root = FilesRoot.url
+            let root = operations.root
             let item = await Task.detached {
                 try? FileListing.item(at: path, root: root, textExtensions: [])
             }.value
@@ -218,7 +219,7 @@ struct NameScreen: View {
         working = true
         Task {
             defer { working = false }
-            let folderURL = purpose.folder.url(in: FilesRoot.url)
+            let folderURL = purpose.folder.url(in: operations.root)
             let taken = await Task.detached {
                 try? FileManager.default.contentsOfDirectory(
                     atPath: folderURL.path(percentEncoded: false))
@@ -231,7 +232,7 @@ struct NameScreen: View {
             }
             if let refused = NameRules.problem(
                 typed: typed, full: full, kind: target.kind, taken: taken,
-                current: target.current)
+                current: target.current, in: purpose.folder)
             {
                 problem = refused
                 return
@@ -283,7 +284,6 @@ struct NameScreen: View {
     }
 
     private func perform(_ full: String, _ target: NameTarget) async {
-        let operations = FilesRoot.operations
         do {
             switch purpose {
             case .create(let kind, let folder):

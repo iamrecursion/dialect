@@ -1,8 +1,8 @@
 import Darwin
 import Foundation
 
-/// One extended attribute, as Info's Extended screen lists it.
-struct ExtendedAttribute: Hashable, Sendable {
+/// One extended attribute.
+struct ExtendedAttribute: Codable, Hashable, Sendable {
     let name: String
 
     /// The value's size in bytes.
@@ -10,7 +10,7 @@ struct ExtendedAttribute: Hashable, Sendable {
 }
 
 /// The Darwin calls for extended attributes. They don't follow a final symbolic
-/// link, so a link's attributes are read, not its target's.
+/// link, so a link's attributes are read instead of its target's.
 enum ExtendedAttributes {
     static func get(_ name: String, at url: URL) -> Data? {
         return url.withUnsafeFileSystemRepresentation { path -> Data? in

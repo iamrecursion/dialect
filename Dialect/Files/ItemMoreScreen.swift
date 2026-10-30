@@ -5,6 +5,7 @@ struct ItemMoreScreen: View {
     let path: FilePath
 
     @Environment(Navigation.self) private var navigation
+    @Environment(\.fileOperations) private var operations
 
     @State private var info: LoadedInfo?
     @State private var loaded = false
@@ -66,7 +67,7 @@ struct ItemMoreScreen: View {
                         }
                     }
                 }
-                UndoRows(here: path.parent ?? .root)
+                UndoRows(here: path.parent ?? .root, operations: operations)
                     .disabled(transfer != nil || deleting)
                 Section {
                     Button(action: delete) {
@@ -85,12 +86,12 @@ struct ItemMoreScreen: View {
             navigation.pop(to: Route.folderRoute(for: path.parent ?? .root))
         }
         .task {
-            let clipboard = FilesRoot.operations.clipboard
-            let root = FilesRoot.url
+            let clipboard = operations.clipboard
+            let root = operations.root
             clipboardHolds = await Task.detached {
                 !clipboard.existing(root: root).isEmpty
             }.value
-            await LoadedInfo.load(path, countsItems: false) {
+            await LoadedInfo.load(path, root: root, countsItems: false) {
                 info = $0
                 loaded = true
             }
@@ -110,7 +111,7 @@ struct ItemMoreScreen: View {
         Task {
             defer { copying = false }
             do {
-                try await FileOperations.copyWithTap([path])
+                try await operations.copyWithTap([path])
                 navigation.pop()
             } catch {
                 failure = OperationFailure("Couldn't Copy", error)
@@ -125,7 +126,7 @@ struct ItemMoreScreen: View {
         Task {
             defer { deleting = false }
             do {
-                _ = try await FilesRoot.operations.delete([path])
+                _ = try await operations.delete([path])
                 navigation.leave(path)
             } catch {
                 failure = OperationFailure("Couldn't Delete", error)

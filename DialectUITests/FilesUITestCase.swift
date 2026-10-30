@@ -207,10 +207,16 @@ class FilesUITestCase: XCTestCase {
         usleep(800_000)
     }
 
+    /// Holds a row until More opens, first bringing it away from the bottom of
+    /// the screen, as holding there opens the app switcher.
     @MainActor
     func longPress(_ label: String) {
         let target = row(label)
         XCTAssertTrue(target.waitForExistence(timeout: 5), "no row \(label)")
+        XCTAssertTrue(scrollTo(target), "no row \(label)")
+        for _ in 0..<6 where target.frame.midY > app.frame.height * 0.7 {
+            drag(towardEnd: true, short: true)
+        }
         target.press(forDuration: 1.2)
         waitForTitle("More")
         // Info loads after the screen appears: the header's "Type · Size" line.

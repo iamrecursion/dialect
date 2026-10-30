@@ -10,11 +10,11 @@ enum ClipboardSymbol {
 }
 
 extension FileOperations {
-    /// Puts `paths` on the clipboard with a tap on the wrist, so a Copy is felt
-    /// as well as seen in the Clipboard button's count.
+    /// Puts `paths` on the clipboard with a haptic tap, so a Copy is felt as
+    /// well as seen in the Clipboard button's count.
     @MainActor
-    static func copyWithTap(_ paths: [FilePath]) async throws {
-        try await FilesRoot.operations.copy(paths)
+    func copyWithTap(_ paths: [FilePath]) async throws {
+        try await copy(paths)
         WKInterfaceDevice.current().play(.click)
     }
 }
@@ -65,6 +65,7 @@ private struct ClipboardTransferModifier: ViewModifier {
     @Binding var request: TransferRequest?
     let done: () -> Void
 
+    @Environment(\.fileOperations) private var operations
     @State private var queue = ClashQueue([])
     @State private var asking = false
     @State private var applyToAll = false
@@ -103,7 +104,7 @@ private struct ClipboardTransferModifier: ViewModifier {
         Task {
             do {
                 queue = ClashQueue(
-                    try await FilesRoot.operations.clashes(request.kind, into: request.folder))
+                    try await operations.clashes(request.kind, into: request.folder))
             } catch {
                 fail(request.kind, error)
                 return
@@ -137,7 +138,6 @@ private struct ClipboardTransferModifier: ViewModifier {
     }
 
     private func run(_ request: TransferRequest) async {
-        let operations = FilesRoot.operations
         do {
             switch request.kind {
             case .paste:

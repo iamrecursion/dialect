@@ -17,7 +17,13 @@ struct BinEntry: Identifiable, Hashable, Sendable {
         self.kind =
             FileKind.classify(
                 name: item.name, isDirectory: item.isDirectory, textExtensions: textExtensions)
-            ?? FileKind.sniff(item.url)
+            ?? Self.sniff(item.url)
+    }
+
+    /// A pipe or anything else not a regular file is binary and never opened.
+    private static func sniff(_ url: URL) -> FileKind {
+        let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
+        return values?.isRegularFile == true ? FileKind.sniff(url) : .binary
     }
 
     /// The row's lines beneath the name: "Deleted *when*", then the days left
@@ -26,17 +32,13 @@ struct BinEntry: Identifiable, Hashable, Sendable {
         for item: BinItem, now: Date, relative: Bool, style: DateStyle, use24Hour: Bool,
         emptyAfter days: Int?
     ) -> [String] {
-        let when = DateDisplay.string(
-            for: item.deleted, now: now, relative: relative, style: style, use24Hour: use24Hour,
-            startsSentence: false)
-        let deleted = String(localized: "Deleted \(when)")
-        guard let left = item.daysLeft(now: now, after: days) else { return [deleted] }
-        return [deleted, daysLeft(left)]
+        return BinExpiry.detail(
+            deleted: item.deleted, now: now, relative: relative, style: style,
+            use24Hour: use24Hour, emptyAfter: days)
     }
 
     static func daysLeft(_ days: Int) -> String {
-        return days == 1
-            ? String(localized: "1 day left") : String(localized: "\(days) days left")
+        return BinExpiry.daysLeft(days)
     }
 }
 
@@ -64,6 +66,7 @@ struct BinScreen: View {
     @Environment(Navigation.self) private var navigation
     @Environment(BinSelection.self) private var selection
     @Environment(\.dialectAccent) private var accent
+    @Environment(\.fileOperations) private var operations
     @AppStorage(FileSettings.relativeModifiedKey) private var relativeModified =
         FileSettings.relativeModifiedDefault
     @AppStorage(FileSettings.dateStyleKey) private var dateStyle = FileSettings.dateStyleDefault
@@ -206,7 +209,6 @@ struct BinScreen: View {
     private func load() async {
         reads += 1
         let read = reads
-        let operations = FilesRoot.operations
         await operations.removeExpired(after: FileSettings.emptyTrashAfter())
         let bin = operations.bin
         let textExtensions = FileSettings.textExtensions()
@@ -222,7 +224,7 @@ struct BinScreen: View {
         leaving.insert(entry.id)
         Task {
             do {
-                note = try await FilesRoot.operations.restore(entry.item).note
+                note = try await operations.restore(entry.item).note
             } catch {
                 failure = OperationFailure("Couldn't Restore", error)
             }
@@ -235,7 +237,7 @@ struct BinScreen: View {
         leaving.insert(entry.id)
         Task {
             do {
-                try await FilesRoot.operations.deletePermanently([entry.item])
+                try await operations.deletePermanently([entry.item])
             } catch {
                 failure = OperationFailure("Couldn't Delete", error)
             }
@@ -287,6 +289,7 @@ struct BinItemScreen: View {
     let id: UUID
 
     @Environment(Navigation.self) private var navigation
+    @Environment(\.fileOperations) private var operations
     @AppStorage(FileSettings.dateStyleKey) private var dateStyle = FileSettings.dateStyleDefault
     @AppStorage(FileSettings.use24HourKey) private var use24Hour = FileSettings.use24HourDefault
     @AppStorage(FileSettings.emptyTrashAfterKey) private var emptyTrashAfter =
@@ -368,7 +371,7 @@ struct BinItemScreen: View {
     /// Reads the item, then its size: a folder's or session's total takes a
     /// walk.
     private func load() async {
-        let bin = FilesRoot.operations.bin
+        let bin = operations.bin
         let textExtensions = FileSettings.textExtensions()
         let id = id
         let found = await Task.detached {
@@ -390,7 +393,7 @@ struct BinItemScreen: View {
         Task {
             defer { working = false }
             do {
-                let restored = try await FilesRoot.operations.restore(entry.item)
+                let restored = try await operations.restore(entry.item)
                 if let message = restored.note {
                     note = message
                 } else {
@@ -408,7 +411,7 @@ struct BinItemScreen: View {
         Task {
             defer { working = false }
             do {
-                try await FilesRoot.operations.deletePermanently([entry.item])
+                try await operations.deletePermanently([entry.item])
                 navigation.pop(to: .bin)
             } catch {
                 failure = OperationFailure("Couldn't Delete", error)
@@ -422,6 +425,7 @@ struct BinItemScreen: View {
 struct BinMoreScreen: View {
     @Environment(Navigation.self) private var navigation
     @Environment(BinSelection.self) private var selection
+    @Environment(\.fileOperations) private var operations
 
     /// How many items are in the bin, read as the screen appears.
     @State private var count: Int?
@@ -452,7 +456,7 @@ struct BinMoreScreen: View {
         }
         .navigationTitle("More")
         .task {
-            let bin = FilesRoot.operations.bin
+            let bin = operations.bin
             count = await Task.detached { bin.items().count }.value
         }
         .confirmationDialog(
@@ -529,7 +533,6 @@ struct BinMoreScreen: View {
         Task {
             defer { working = false }
             do {
-                let operations = FilesRoot.operations
                 let restored: [Restored]
                 if let selected {
                     let items = await Self.items(selected, in: operations.bin)
@@ -591,7 +594,6 @@ struct BinMoreScreen: View {
         Task {
             defer { working = false }
             do {
-                let operations = FilesRoot.operations
                 if let selected {
                     let items = await Self.items(selected, in: operations.bin)
                     try await operations.deletePermanently(items)

@@ -14,6 +14,7 @@ struct WatchLinkTests {
         var fails = false
         var sent: [[String: Any]] = []
         var messages: [[String: Any]] = []
+        var infos: [[String: Any]] = []
 
         func send(_ context: [String: Any]) throws {
             if fails { throw CocoaError(.featureUnsupported) }
@@ -24,6 +25,10 @@ struct WatchLinkTests {
             _ message: [String: Any], failed: @escaping @Sendable (any Error) -> Void
         ) {
             messages.append(message)
+        }
+
+        func sendInfo(_ info: [String: Any]) {
+            infos.append(info)
         }
     }
 
@@ -245,5 +250,29 @@ struct WatchLinkTests {
         // The same edit from the context gets no answer; only messages are answered.
         link.apply(stale)
         #expect(session.messages.count == 1)
+    }
+
+    // MARK: Files
+
+    /// Answers a request by user info, in turn; waiting for delivery waits for
+    /// the answers too.
+    @Test func answersFilesByUserInfo() async throws {
+        let files = try TemporaryRoot()
+        try files.file("a.txt")
+        let service = FilesService(root: files.url, stores: root.url, defaults: defaults)
+        let link = WatchLink(
+            session: session, mirror: Mirror(url: root.url.appending(path: "Mirror2.json")),
+            defaults: defaults, watchName: "Watch", undoSteps: { 0 }, trimHistory: { _ in },
+            files: service, delay: Self.delay)
+        link.activated(with: nil)
+
+        let data = try FilesCoding.encode(FilesRequest(body: .list(.root, offset: 0, token: nil)))
+        link.answer(FilesUserInfo(id: "A", data: data, sent: Date()))
+        link.answer(FilesUserInfo(id: "old", data: data, sent: Date() - 60))
+        await link.waitForDelivery()
+
+        #expect(session.infos.count == 1)
+        let answer = try #require(session.infos.first.flatMap(FilesUserInfo.init(answer:)))
+        #expect(answer.id == "A")
     }
 }

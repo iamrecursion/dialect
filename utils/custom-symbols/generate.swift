@@ -12,7 +12,7 @@ import Foundation
 //
 //     swift utils/custom-symbols/generate.swift /tmp/symbols
 //
-// then copy each SVG over the one in its `Dialect/Assets.xcassets/<name>.symbolset`. The templates
+// then copy each SVG over the one in its `Common/Assets.xcassets/<name>.symbolset`. The templates
 // open in the SF Symbols app for hand refinement.
 
 guard CommandLine.arguments.count == 2 else {

@@ -126,29 +126,6 @@ extension NewItemKind {
     }
 }
 
-extension FilePath: Codable {
-    /// Refuses a path that could reach outside the root, so a damaged history
-    /// reads as empty.
-    init(from decoder: any Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let components = try container.decode([String].self)
-        guard
-            components.allSatisfy({
-                !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("/")
-            })
-        else {
-            throw DecodingError.dataCorruptedError(
-                in: container, debugDescription: "Not a path in Files: \(components)")
-        }
-        self.init(components: components)
-    }
-
-    func encode(to encoder: any Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(components)
-    }
-}
-
 extension FileOperations {
     /// The history in `stores`.
     nonisolated var history: History { History(url: FilesStores.history(in: stores)) }

@@ -33,7 +33,7 @@ struct PathScreen: View {
             let kind = FileKind.classify(
                 name: components[index], isDirectory: true, textExtensions: [])
             return PathLevel(
-                title: FolderScreen.displayName(
+                title: FileItem.displayName(
                     of: components[index], showExtensions: showExtensions),
                 symbol: (kind ?? .folder).symbol, route: .folder(path),
                 isCurrent: path == folder)

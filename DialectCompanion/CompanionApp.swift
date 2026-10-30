@@ -1,23 +1,33 @@
 import SwiftUI
+import WatchConnectivity
 
 @main
 struct CompanionApp: App {
-    @State private var link = Self.startLink()
+    @State private var services = Self.start()
 
     var body: some Scene {
         WindowGroup {
             CompanionTabs()
-                .environment(link)
+                .environment(services.link)
+                .environment(services.files)
         }
     }
 
-    private static func startLink() -> PhoneLink {
+    /// The link and Files, against the fake watch if the launch arguments say
+    /// so.
+    private static func start() -> (link: PhoneLink, files: WatchFiles) {
         #if DEBUG
-            if let facts = FakeWatch.facts() { return PhoneLink(facts: facts) }
+            if let facts = FakeWatch.facts() {
+                let link = PhoneLink(facts: facts, watchDirectory: FakeWatch.cacheDirectory)
+                return (link, FakeWatch.files())
+            }
         #endif
+        let connection = LiveFilesConnection(session: WCSession.default)
         let link = PhoneLink()
-        link.start()
-        return link
+        link.start(
+            filesAnswers: { connection.deliver($0) },
+            reachability: { connection.reachabilityChanged($0) })
+        return (link, WatchFiles(connection: connection))
     }
 }
 
@@ -36,7 +46,8 @@ struct CompanionTabs: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityDifferentiateWithoutColor) private var withoutColor
     @Environment(\.scenePhase) private var scenePhase
-    @State private var tab = CompanionTab.settings
+    @Environment(WatchFiles.self) private var files
+    @State private var tab = CompanionTab.files
 
     var body: some View {
         TabView(selection: $tab) {
@@ -66,10 +77,23 @@ struct CompanionTabs: View {
             }
         }
         .tint(Color(accent))
+        .onChange(of: filesState, initial: true) { _, state in
+            files.follow(state)
+        }
         .onChange(of: scenePhase) { _, phase in
             // The app switcher makes the app inactive, and it can be quit from there.
             if phase != .active { link.flush() }
+            if phase == .active { files.becameActive() }
         }
+    }
+
+    /// What Files needs of the link.
+    private var filesState: FilesLinkState {
+        return FilesLinkState(
+            status: link.status, isReachable: link.facts?.isReachable ?? false,
+            epoch: link.snapshot?.epoch,
+            directory: link.watchDirectory,
+            display: FilesDisplay(value: link.value))
     }
 
     /// The appearance the Watch tab's icon is drawn for.

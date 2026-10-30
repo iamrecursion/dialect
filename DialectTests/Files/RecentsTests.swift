@@ -82,6 +82,20 @@ struct RecentsTests {
         #expect(shown.map(\.path) == held)
     }
 
+    /// The inbox and anything in it are left out, even pinned.
+    @Test func leavesOutTheInbox() throws {
+        let setup = try OperationsSetup()
+        try setup.root.file("Inbox/a.txt")
+        try setup.root.file("notes/Inbox/b.txt")
+        let inside = FilePath("Inbox/a.txt")
+        try setup.recents.write(
+            Recents.Held(paths: [inside, FilePath("notes/Inbox/b.txt")], pinned: [inside]))
+        let listing = setup.recents.listing(
+            root: setup.root.url, textExtensions: [], showHidden: true, limit: 5)
+        #expect(listing.recent.map(\.path) == [FilePath("notes/Inbox/b.txt")])
+        #expect(listing.pinned.isEmpty)
+    }
+
     // MARK: Recording
 
     @Test func recordsNewestFirstAndOnce() async throws {

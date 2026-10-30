@@ -70,6 +70,35 @@ struct FileOperationsTests {
         #expect(try setup.names().isEmpty)
     }
 
+    /// The inbox's name is refused with no folder there, and with one, which is
+    /// left alone; a folder of that name anywhere else is fine.
+    @Test func reservesTheInboxAtTheRoot() async throws {
+        let setup = try OperationsSetup()
+        await #expect(throws: FileOperationError.name(.reserved)) {
+            try await setup.operations.createFolder(named: "Inbox", in: .root)
+        }
+        await #expect(throws: FileOperationError.name(.reserved)) {
+            try await setup.operations.createFile(named: "inbox", in: .root)
+        }
+        #expect(try setup.names().isEmpty)
+
+        try setup.root.file("notes.txt")
+        await #expect(throws: FileOperationError.name(.reserved)) {
+            _ = try await setup.operations.rename(FilePath("notes.txt"), to: "Inbox")
+        }
+        #expect(try setup.names() == ["notes.txt"])
+
+        try setup.root.file("Inbox/kept.txt")
+        await #expect(throws: FileOperationError.name(.reserved)) {
+            try await setup.operations.createFolder(named: "inbox", in: .root)
+        }
+        #expect(try setup.names("Inbox") == ["kept.txt"])
+
+        try setup.root.folder("scripts")
+        _ = try await setup.operations.createFolder(named: "Inbox", in: FilePath("scripts"))
+        #expect(try setup.names("scripts") == ["Inbox"])
+    }
+
     /// A name taken while the item is being made: the rename into place fails,
     /// and the existing item stays.
     @Test func refusesANameTakenWhileMaking() async throws {
@@ -247,11 +276,11 @@ struct FileOperationsTests {
     @Test func forgetsTheTotalsAboveAChange() async throws {
         let setup = try OperationsSetup()
         try setup.root.file("tree/sub/a.txt", Data(count: 10))
-        let tree = setup.root.url.appending(path: "tree")
-        #expect(await setup.sizes.size(of: tree, modified: nil) == 10)
+        let tree = FilePath("tree")
+        #expect(await setup.sizes.size(of: tree, root: setup.root.url, modified: nil) == 10)
         try setup.root.file("tree/sub/b.txt", Data(count: 5))
         _ = try await setup.operations.rename(FilePath("tree/sub/b.txt"), to: "c.txt")
-        #expect(await setup.sizes.size(of: tree, modified: nil) == 15)
+        #expect(await setup.sizes.size(of: tree, root: setup.root.url, modified: nil) == 15)
     }
 
     @Test func errorsSayWhy() {

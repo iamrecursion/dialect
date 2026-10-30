@@ -74,10 +74,7 @@ final class FilesUITests: FilesUITestCase {
     @MainActor
     func testLongPressOpensMore() {
         launch(at: "folder:notes")
-        let notes = row("notes.md")
-        XCTAssertTrue(notes.waitForExistence(timeout: 5))
-        notes.press(forDuration: 1.2)
-        waitForTitle("More")
+        longPress("notes.md")
         XCTAssertFalse(text(containing: "No viewer yet").exists, "the tap fired as well")
 
         // Back on the folder, a tap opens the item again.

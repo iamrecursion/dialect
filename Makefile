@@ -207,8 +207,8 @@ fork-watch-build: ## Build a fork for the watch simulator and verify the platfor
 	utils/fork-watch-build/fork-watch-build.sh $(FORK) $(TARGET)
 
 # The app's tests run in a watchOS simulator, and the companion's in an iOS one.
-.PHONY: test unit-test smoke-test ui-test companion-test
-test: unit-test smoke-test ui-test companion-test ## Run every test: unit, smoke, UI, then the companion's (SIMULATOR=, PHONE=)
+.PHONY: test unit-test smoke-test ui-test companion-unit-test companion-test
+test: unit-test smoke-test ui-test companion-unit-test companion-test ## Run every test: unit, smoke, UI, then the companion's (SIMULATOR=, PHONE=)
 
 unit-test: project ## Run the unit tests in a watch simulator (SIMULATOR=)
 	SIMULATOR='$(SIMULATOR)' utils/app-test/app-test.sh unit
@@ -218,6 +218,9 @@ smoke-test: project ## Run the smoke tests: the app starts and its main screens 
 
 ui-test: project ## Run the UI tests but the smoke tests, in parallel (SIMULATOR=, UI_WORKERS=)
 	SIMULATOR='$(SIMULATOR)' UI_WORKERS='$(UI_WORKERS)' utils/app-test/app-test.sh ui
+
+companion-unit-test: project ## Run the companion's unit tests in an iPhone simulator (PHONE=)
+	PHONE='$(PHONE)' utils/app-test/app-test.sh companion-unit
 
 companion-test: project ## Run the companion's UI tests in an iPhone simulator (PHONE=)
 	PHONE='$(PHONE)' utils/app-test/app-test.sh companion
